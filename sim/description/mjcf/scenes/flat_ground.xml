@@ -22,7 +22,9 @@
     <geom name="floor" type="plane" size="5 5 0.1" material="groundplane"/>
   </worldbody>
 
+  <!-- base_link sits at the floor-height reference (pelvis is +0.267m above it,
+       per ../tonypi.xml); 0.011 lifts the feet just clear of the ground plane. -->
   <keyframe>
-    <key name="home" qpos="0 0 0.24 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0"/>
+    <key name="home" qpos="0 0 0.011 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0"/>
   </keyframe>
 </mujoco>

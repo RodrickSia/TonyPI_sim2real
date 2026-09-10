@@ -1,274 +1,294 @@
 <?xml version="1.0"?>
-<!-- ============================================================================
-     TonyPi (Hiwonder AI humanoid) — sample URDF, 18 DoF
-     16 serial bus servos (S1..S16) + 2 head PWM servos (pan S17 / tilt S18).
-     Per side: hip_roll, hip_pitch, knee, ankle_pitch, shoulder_pitch, shoulder_roll,
-     elbow, wrist = 8 servos x 2 sides = 16 body + 2 head = 18 total (confirmed:
-     each arm has a real wrist joint, no thumb/gripper). Exact S1..S16 numbering
-     and the knee's originally-assumed "2 servos ganged" wiring are NOT verified
-     against real hardware docs — treat the id comments below as unconfirmed.
-     Units: metres & radians. Wrist axis is an estimate (assumed roll about forearm's
-     long axis), pending confirmation against the real robot.
-     Bus servo: pulse 0..1000 = 240deg, centre 500 -> rad = (pulse-500)*0.004189
-     Boxes are placeholders — swap <box> for <mesh> (Hiwonder AiNex STL, scale 0.001).
-     Load:  check_urdf tonypi.urdf   then RViz + joint_state_publisher_gui
-     ============================================================================ -->
+<!--
+  TonyPi.urdf — Hiwonder TonyPi AI humanoid, 18 DOF (16 serial-bus + 2 PWM head).
+  Source-of-truth kinematic tree, WIGGLE-TEST-CONFIRMED against the real robot
+  (imported from the fleet's shared "URDF Explained" doc, 2026-09-10 — supersedes
+  the previous estimated layout). Visual meshes extracted from the rigged
+  Blender rig (tonypi.glb) and aligned to each link's frame; collision stays
+  primitive (cheap). See ../meshes/visual/ for the STL set.
+
+  Provenance / units:
+    * Link lengths from tonypi.glb bone offsets (metres). Standing height ~0.34 m.
+    * Bus-servo range: pulse 0..1000, centre 500, deg = (pulse-500)*0.24 -> +/-120 deg = +/-2.094 rad.
+    * Head PWM range 500..2500, centre 1500 -> ~ +/-90 deg = +/-1.571 rad.
+
+  Servo -> joint map (measured on the real robot; LEFT = S1..S8, RIGHT = S9..S16, mirror S_n <-> S_n+8):
+    Head : neck_yaw = PWM2 (pan)              head_pitch = PWM1 (tilt)
+    Arm  : shoulder_pitch, upperarm_roll, elbow   (3 DOF/side, S6-S8 / S14-S16 -- no wrist/gripper)
+    Leg  : hip_roll, hip_pitch, knee, ankle_pitch, ankle_roll   (5 DOF/side, S1-S5 / S9-S13)
+
+  NOTE vs. the previous layout: this model has no wrist joint (arms are 3 DOF,
+  ending at the elbow) but adds ankle_roll (legs are 5 DOF) -- important for
+  lateral balance during walking. Total is still 18 DOF, but joint *names* and
+  *meaning* changed; anything referencing old names (L_wrist, L_shoulder_roll,
+  no L_ankle_roll) needs updating.
+
+  Convention: ROS standard Z up, X forward, Y left.
+-->
 <robot name="tonypi">
 
-  <material name="grey"><color rgba="0.75 0.75 0.78 1"/></material>
-  <material name="dark"><color rgba="0.20 0.20 0.22 1"/></material>
-  <material name="accent"><color rgba="0.88 0.48 0.0 1"/></material>
+  <!-- MuJoCo's URDF importer discards <visual> geoms by default (assumes
+       visual == collision) and keeps only <collision>. This model intentionally
+       has real meshes for visual + primitives for collision, so tell it to keep both. -->
+  <mujoco>
+    <compiler discardvisual="false"/>
+  </mujoco>
 
-  <link name="base_link">
-    <visual><origin xyz="0 0 0" rpy="0 0 0"/>
-      <geometry><box size="0.09 0.1 0.14"/></geometry><material name="accent"/></visual>
-    <collision><origin xyz="0 0 0" rpy="0 0 0"/>
-      <geometry><box size="0.09 0.1 0.14"/></geometry></collision>
-    <inertial><mass value="0.6"/><origin xyz="0 0 0"/>
-      <inertia ixx="0.002" iyy="0.002" izz="0.001" ixy="0" ixz="0" iyz="0"/></inertial>
+  <!-- ============================ materials ============================ -->
+  <material name="shell"><color rgba="0.93 0.93 0.95 1"/></material>
+  <material name="joint"><color rgba="0.15 0.16 0.18 1"/></material>
+  <material name="accent"><color rgba="0.20 0.55 0.95 1"/></material>
+
+  <!-- ============================ base / torso ========================= -->
+  <link name="base_link"/>
+
+  <joint name="base_to_pelvis" type="fixed">
+    <parent link="base_link"/>
+    <child link="pelvis"/>
+    <origin xyz="0 0 0.267" rpy="0 0 0"/>
+  </joint>
+
+  <link name="pelvis">
+    <visual>Copilot Business
+    
+      <geometry><mesh filename="../meshes/visual/pelvis.stl" scale="1 1 1"/></geometry>
+      <material name="shell"/>
+    </visual>
+    <collision><origin xyz="0 0 0.02"/><geometry><box size="0.075 0.09 0.05"/></geometry></collision>
+    <inertial>
+      <mass value="0.60"/>
+      <inertia ixx="8e-4" iyy="8e-4" izz="6e-4" ixy="0" ixz="0" iyz="0"/>
+    </inertial>
   </link>
 
-  <!-- ===================== HEAD (PWM servos) ===================== -->
-  <!-- dummy pivot links get a tiny inertial so MuJoCo (requires mass>0 on moving bodies) can compile the URDF -->
+  <link name="torso">
+    <collision><origin xyz="0 0 0.025"/><geometry><box size="0.085 0.10 0.055"/></geometry></collision>
+    <inertial><mass value="0.45"/><inertia ixx="6e-4" iyy="6e-4" izz="5e-4" ixy="0" ixz="0" iyz="0"/></inertial>
+  </link>
+  <joint name="spine_fixed" type="fixed">
+    <parent link="pelvis"/><child link="torso"/>
+    <origin xyz="0 0 0.05" rpy="0 0 0"/>
+  </joint>
+
+  <!-- ============================ head ================================= -->
   <link name="neck">
-    <inertial><mass value="0.001"/><origin xyz="0 0 0"/>
-      <inertia ixx="1e-06" iyy="1e-06" izz="1e-06" ixy="0" ixz="0" iyz="0"/></inertial>
+    <visual><geometry><mesh filename="../meshes/visual/neck.stl" scale="1 1 1"/></geometry><material name="joint"/></visual>
+    <collision><geometry><cylinder radius="0.012" length="0.030"/></geometry></collision>
+    <inertial><mass value="0.03"/><inertia ixx="5e-6" iyy="5e-6" izz="5e-6" ixy="0" ixz="0" iyz="0"/></inertial>
   </link>
-  <joint name="neck_yaw" type="revolute">   <!-- S17 head pan (PWM2) -->
-    <parent link="base_link"/><child link="neck"/>
-    <origin xyz="0 0 0.075" rpy="0 0 0"/>
+  <joint name="neck_yaw" type="revolute">   <!-- PWM2 head pan -->
+    <parent link="torso"/><child link="neck"/>
+    <origin xyz="0 0 0.05" rpy="0 0 0"/>
     <axis xyz="0 0 1"/>
-    <limit lower="-1.4" upper="1.4" effort="4" velocity="6"/>
+    <limit lower="-1.571" upper="1.571" effort="1.0" velocity="3.0"/>
   </joint>
+
   <link name="head">
-    <visual><origin xyz="0 0 0.03" rpy="0 0 0"/>
-      <geometry><box size="0.06 0.07 0.06"/></geometry><material name="grey"/></visual>
-    <collision><origin xyz="0 0 0.03" rpy="0 0 0"/>
-      <geometry><box size="0.06 0.07 0.06"/></geometry></collision>
-    <inertial><mass value="0.25"/><origin xyz="0 0 0.03"/>
-      <inertia ixx="0.0003" iyy="0.0003" izz="0.0003" ixy="0" ixz="0" iyz="0"/></inertial>
+    <visual><geometry><mesh filename="../meshes/visual/head.stl" scale="1 1 1"/></geometry><material name="shell"/></visual>
+    <collision><origin xyz="0 0.01 0.03"/><geometry><box size="0.07 0.075 0.07"/></geometry></collision>
+    <inertial><mass value="0.15"/><inertia ixx="1.5e-4" iyy="1.5e-4" izz="1.5e-4" ixy="0" ixz="0" iyz="0"/></inertial>
   </link>
-  <joint name="head_pitch" type="revolute">   <!-- S18 head tilt (PWM1) -->
+  <joint name="head_pitch" type="revolute">   <!-- PWM1 head tilt -->
     <parent link="neck"/><child link="head"/>
-    <origin xyz="0 0 0.03" rpy="0 0 0"/>
+    <origin xyz="0 0.006 0.02" rpy="0 0 0"/>
     <axis xyz="0 1 0"/>
-    <limit lower="-0.7" upper="0.7" effort="4" velocity="6"/>
+    <limit lower="-1.0" upper="1.0" effort="1.0" velocity="3.0"/>
   </joint>
 
-  <!-- ===================== LEFT ARM ===================== -->
-  <link name="L_shoulder">
-    <inertial><mass value="0.001"/><origin xyz="0 0 0"/>
-      <inertia ixx="1e-06" iyy="1e-06" izz="1e-06" ixy="0" ixz="0" iyz="0"/></inertial>
+  <!-- ============================ LEFT arm ============================= -->
+  <link name="l_shoulder">
+    <visual><geometry><mesh filename="../meshes/visual/l_shoulder.stl" scale="1 1 1"/></geometry><material name="joint"/></visual>
+    <collision><geometry><sphere radius="0.017"/></geometry></collision>
+    <inertial><mass value="0.04"/><inertia ixx="8e-6" iyy="8e-6" izz="8e-6" ixy="0" ixz="0" iyz="0"/></inertial>
   </link>
-  <joint name="L_shoulder_pitch" type="revolute">   <!-- S8 shoulder-pitch -->
-    <parent link="base_link"/><child link="L_shoulder"/>
-    <origin xyz="0 0.06 0.06" rpy="0 0 0"/>
+  <joint name="l_shoulder_pitch" type="revolute">   <!-- S8 -->
+    <parent link="torso"/><child link="l_shoulder"/>
+    <origin xyz="0 0.058 0.033" rpy="0 0 0"/>
     <axis xyz="0 1 0"/>
-    <limit lower="-2.0" upper="2.0" effort="4" velocity="6"/>
+    <limit lower="-2.094" upper="2.094" effort="1.5" velocity="4.0"/>
   </joint>
-  <link name="L_upper_arm">
-    <visual><origin xyz="0 0.03 0" rpy="0 0 0"/>
-      <geometry><box size="0.025 0.06 0.025"/></geometry><material name="grey"/></visual>
-    <collision><origin xyz="0 0.03 0" rpy="0 0 0"/>
-      <geometry><box size="0.025 0.06 0.025"/></geometry></collision>
-    <inertial><mass value="0.1"/><origin xyz="0 0.03 0"/>
-      <inertia ixx="6e-05" iyy="3e-05" izz="6e-05" ixy="0" ixz="0" iyz="0"/></inertial>
+
+  <link name="l_upper_arm">
+    <visual><geometry><mesh filename="../meshes/visual/l_upper_arm.stl" scale="1 1 1"/></geometry><material name="shell"/></visual>
+    <collision><origin xyz="0 0 -0.029"/><geometry><cylinder radius="0.014" length="0.058"/></geometry></collision>
+    <inertial><mass value="0.08"/><inertia ixx="3e-5" iyy="1e-5" izz="3e-5" ixy="0" ixz="0" iyz="0"/></inertial>
   </link>
-  <joint name="L_shoulder_roll" type="revolute">   <!-- S7 shoulder-roll -->
-    <parent link="L_shoulder"/><child link="L_upper_arm"/>
+  <joint name="l_upperarm_roll" type="revolute">   <!-- S7, roll about the hanging arm's own axis (Z) -->
+    <parent link="l_shoulder"/><child link="l_upper_arm"/>
     <origin xyz="0 0 0" rpy="0 0 0"/>
-    <axis xyz="1 0 0"/>
-    <limit lower="-2.6" upper="2.6" effort="4" velocity="6"/>
-  </joint>
-  <link name="L_forearm">
-    <visual><origin xyz="0 0.03 0" rpy="0 0 0"/>
-      <geometry><box size="0.022 0.06 0.022"/></geometry><material name="dark"/></visual>
-    <collision><origin xyz="0 0.03 0" rpy="0 0 0"/>
-      <geometry><box size="0.022 0.06 0.022"/></geometry></collision>
-    <inertial><mass value="0.08"/><origin xyz="0 0.03 0"/>
-      <inertia ixx="5e-05" iyy="2e-05" izz="5e-05" ixy="0" ixz="0" iyz="0"/></inertial>
-  </link>
-  <joint name="L_elbow" type="revolute">   <!-- S6 elbow (Z hinge) -->
-    <parent link="L_upper_arm"/><child link="L_forearm"/>
-    <origin xyz="0 0.06 0" rpy="0 0 0"/>
     <axis xyz="0 0 1"/>
-    <limit lower="-2.4" upper="2.4" effort="4" velocity="6"/>
-  </joint>
-  <link name="L_hand">
-    <visual><origin xyz="0 0.015 0" rpy="0 0 0"/>
-      <geometry><box size="0.05 0.03 0.01"/></geometry><material name="dark"/></visual>
-    <collision><origin xyz="0 0.015 0" rpy="0 0 0"/>
-      <geometry><box size="0.05 0.03 0.01"/></geometry></collision>
-    <inertial><mass value="0.05"/><origin xyz="0 0.015 0"/>
-      <inertia ixx="2e-05" iyy="2e-05" izz="2e-05" ixy="0" ixz="0" iyz="0"/></inertial>
-  </link>
-  <joint name="L_wrist" type="revolute">   <!-- wrist roll, no gripper (flat hand) -->
-    <parent link="L_forearm"/><child link="L_hand"/>
-    <origin xyz="0 0.06 0" rpy="0 0 0"/>
-    <axis xyz="0 1 0"/>
-    <limit lower="-2.0" upper="2.0" effort="4" velocity="6"/>
+    <limit lower="-2.094" upper="2.094" effort="1.5" velocity="4.0"/>
   </joint>
 
-  <!-- ===================== RIGHT ARM ===================== -->
-  <link name="R_shoulder">
-    <inertial><mass value="0.001"/><origin xyz="0 0 0"/>
-      <inertia ixx="1e-06" iyy="1e-06" izz="1e-06" ixy="0" ixz="0" iyz="0"/></inertial>
+  <link name="l_forearm">
+    <visual><geometry><mesh filename="../meshes/visual/l_forearm.stl" scale="1 1 1"/></geometry><material name="accent"/></visual>
+    <collision><origin xyz="0 0 -0.030"/><geometry><cylinder radius="0.012" length="0.061"/></geometry></collision>
+    <inertial><mass value="0.06"/><inertia ixx="2e-5" iyy="8e-6" izz="2e-5" ixy="0" ixz="0" iyz="0"/></inertial>
   </link>
-  <joint name="R_shoulder_pitch" type="revolute">   <!-- S16 shoulder-pitch -->
-    <parent link="base_link"/><child link="R_shoulder"/>
-    <origin xyz="0 -0.06 0.06" rpy="0 0 0"/>
+  <joint name="l_elbow" type="revolute">   <!-- S6 -->
+    <parent link="l_upper_arm"/><child link="l_forearm"/>
+    <origin xyz="0 0 -0.058" rpy="0 0 0"/>
     <axis xyz="0 1 0"/>
-    <limit lower="-2.0" upper="2.0" effort="4" velocity="6"/>
+    <limit lower="-2.094" upper="2.094" effort="1.2" velocity="4.0"/>
   </joint>
-  <link name="R_upper_arm">
-    <visual><origin xyz="0 -0.03 0" rpy="0 0 0"/>
-      <geometry><box size="0.025 0.06 0.025"/></geometry><material name="grey"/></visual>
-    <collision><origin xyz="0 -0.03 0" rpy="0 0 0"/>
-      <geometry><box size="0.025 0.06 0.025"/></geometry></collision>
-    <inertial><mass value="0.1"/><origin xyz="0 -0.03 0"/>
-      <inertia ixx="6e-05" iyy="3e-05" izz="6e-05" ixy="0" ixz="0" iyz="0"/></inertial>
+
+  <!-- ============================ RIGHT arm ============================ -->
+  <link name="r_shoulder">
+    <visual><geometry><mesh filename="../meshes/visual/r_shoulder.stl" scale="1 1 1"/></geometry><material name="joint"/></visual>
+    <collision><geometry><sphere radius="0.017"/></geometry></collision>
+    <inertial><mass value="0.04"/><inertia ixx="8e-6" iyy="8e-6" izz="8e-6" ixy="0" ixz="0" iyz="0"/></inertial>
   </link>
-  <joint name="R_shoulder_roll" type="revolute">   <!-- S15 shoulder-roll -->
-    <parent link="R_shoulder"/><child link="R_upper_arm"/>
+  <joint name="r_shoulder_pitch" type="revolute">   <!-- S16 -->
+    <parent link="torso"/><child link="r_shoulder"/>
+    <origin xyz="0 -0.058 0.033" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/>
+    <limit lower="-2.094" upper="2.094" effort="1.5" velocity="4.0"/>
+  </joint>
+
+  <link name="r_upper_arm">
+    <visual><geometry><mesh filename="../meshes/visual/r_upper_arm.stl" scale="1 1 1"/></geometry><material name="shell"/></visual>
+    <collision><origin xyz="0 0 -0.029"/><geometry><cylinder radius="0.014" length="0.058"/></geometry></collision>
+    <inertial><mass value="0.08"/><inertia ixx="3e-5" iyy="1e-5" izz="3e-5" ixy="0" ixz="0" iyz="0"/></inertial>
+  </link>
+  <joint name="r_upperarm_roll" type="revolute">   <!-- S15 -->
+    <parent link="r_shoulder"/><child link="r_upper_arm"/>
     <origin xyz="0 0 0" rpy="0 0 0"/>
-    <axis xyz="1 0 0"/>
-    <limit lower="-2.6" upper="2.6" effort="4" velocity="6"/>
-  </joint>
-  <link name="R_forearm">
-    <visual><origin xyz="0 -0.03 0" rpy="0 0 0"/>
-      <geometry><box size="0.022 0.06 0.022"/></geometry><material name="dark"/></visual>
-    <collision><origin xyz="0 -0.03 0" rpy="0 0 0"/>
-      <geometry><box size="0.022 0.06 0.022"/></geometry></collision>
-    <inertial><mass value="0.08"/><origin xyz="0 -0.03 0"/>
-      <inertia ixx="5e-05" iyy="2e-05" izz="5e-05" ixy="0" ixz="0" iyz="0"/></inertial>
-  </link>
-  <joint name="R_elbow" type="revolute">   <!-- S14 elbow (Z hinge) -->
-    <parent link="R_upper_arm"/><child link="R_forearm"/>
-    <origin xyz="0 -0.06 0" rpy="0 0 0"/>
     <axis xyz="0 0 1"/>
-    <limit lower="-2.4" upper="2.4" effort="4" velocity="6"/>
-  </joint>
-  <link name="R_hand">
-    <visual><origin xyz="0 -0.015 0" rpy="0 0 0"/>
-      <geometry><box size="0.05 0.03 0.01"/></geometry><material name="dark"/></visual>
-    <collision><origin xyz="0 -0.015 0" rpy="0 0 0"/>
-      <geometry><box size="0.05 0.03 0.01"/></geometry></collision>
-    <inertial><mass value="0.05"/><origin xyz="0 -0.015 0"/>
-      <inertia ixx="2e-05" iyy="2e-05" izz="2e-05" ixy="0" ixz="0" iyz="0"/></inertial>
-  </link>
-  <joint name="R_wrist" type="revolute">   <!-- wrist roll, no gripper (flat hand) -->
-    <parent link="R_forearm"/><child link="R_hand"/>
-    <origin xyz="0 -0.06 0" rpy="0 0 0"/>
-    <axis xyz="0 1 0"/>
-    <limit lower="-2.0" upper="2.0" effort="4" velocity="6"/>
+    <limit lower="-2.094" upper="2.094" effort="1.5" velocity="4.0"/>
   </joint>
 
-  <!-- ===================== LEFT LEG ===================== -->
-  <link name="L_hip">
-    <inertial><mass value="0.001"/><origin xyz="0 0 0"/>
-      <inertia ixx="1e-06" iyy="1e-06" izz="1e-06" ixy="0" ixz="0" iyz="0"/></inertial>
+  <link name="r_forearm">
+    <visual><geometry><mesh filename="../meshes/visual/r_forearm.stl" scale="1 1 1"/></geometry><material name="accent"/></visual>
+    <collision><origin xyz="0 0 -0.030"/><geometry><cylinder radius="0.012" length="0.061"/></geometry></collision>
+    <inertial><mass value="0.06"/><inertia ixx="2e-5" iyy="8e-6" izz="2e-5" ixy="0" ixz="0" iyz="0"/></inertial>
   </link>
-  <joint name="L_hip_roll" type="revolute">   <!-- S5 hip-roll -->
-    <parent link="base_link"/><child link="L_hip"/>
-    <origin xyz="0 0.045 -0.07" rpy="0 0 0"/>
-    <axis xyz="1 0 0"/>
-    <limit lower="-0.6" upper="0.6" effort="4" velocity="6"/>
-  </joint>
-  <link name="L_thigh">
-    <visual><origin xyz="0 0 -0.035" rpy="0 0 0"/>
-      <geometry><box size="0.03 0.03 0.07"/></geometry><material name="grey"/></visual>
-    <collision><origin xyz="0 0 -0.035" rpy="0 0 0"/>
-      <geometry><box size="0.03 0.03 0.07"/></geometry></collision>
-    <inertial><mass value="0.12"/><origin xyz="0 0 -0.035"/>
-      <inertia ixx="8e-05" iyy="8e-05" izz="2e-05" ixy="0" ixz="0" iyz="0"/></inertial>
-  </link>
-  <joint name="L_hip_pitch" type="revolute">   <!-- S4 hip-pitch -->
-    <parent link="L_hip"/><child link="L_thigh"/>
-    <origin xyz="0 0 0" rpy="0 0 0"/>
+  <joint name="r_elbow" type="revolute">   <!-- S14 -->
+    <parent link="r_upper_arm"/><child link="r_forearm"/>
+    <origin xyz="0 0 -0.058" rpy="0 0 0"/>
     <axis xyz="0 1 0"/>
-    <limit lower="-1.57" upper="1.57" effort="4" velocity="6"/>
-  </joint>
-  <link name="L_shin">
-    <visual><origin xyz="0 0 -0.035" rpy="0 0 0"/>
-      <geometry><box size="0.028 0.028 0.07"/></geometry><material name="grey"/></visual>
-    <collision><origin xyz="0 0 -0.035" rpy="0 0 0"/>
-      <geometry><box size="0.028 0.028 0.07"/></geometry></collision>
-    <inertial><mass value="0.1"/><origin xyz="0 0 -0.035"/>
-      <inertia ixx="7e-05" iyy="7e-05" izz="2e-05" ixy="0" ixz="0" iyz="0"/></inertial>
-  </link>
-  <joint name="L_knee" type="revolute">   <!-- S2+S3 knee (ganged) -->
-    <parent link="L_thigh"/><child link="L_shin"/>
-    <origin xyz="0 0 -0.07" rpy="0 0 0"/>
-    <axis xyz="0 1 0"/>
-    <limit lower="0.0" upper="2.2" effort="4" velocity="6"/>
-  </joint>
-  <link name="L_foot">
-    <visual><origin xyz="0.015 0 -0.01" rpy="0 0 0"/>
-      <geometry><box size="0.07 0.04 0.02"/></geometry><material name="dark"/></visual>
-    <collision><origin xyz="0.015 0 -0.01" rpy="0 0 0"/>
-      <geometry><box size="0.07 0.04 0.02"/></geometry></collision>
-    <inertial><mass value="0.08"/><origin xyz="0.015 0 -0.01"/>
-      <inertia ixx="3e-05" iyy="6e-05" izz="7e-05" ixy="0" ixz="0" iyz="0"/></inertial>
-  </link>
-  <joint name="L_ankle_pitch" type="revolute">   <!-- S1 ankle-pitch -->
-    <parent link="L_shin"/><child link="L_foot"/>
-    <origin xyz="0 0 -0.07" rpy="0 0 0"/>
-    <axis xyz="0 1 0"/>
-    <limit lower="-1.2" upper="1.2" effort="4" velocity="6"/>
+    <limit lower="-2.094" upper="2.094" effort="1.2" velocity="4.0"/>
   </joint>
 
-  <!-- ===================== RIGHT LEG ===================== -->
-  <link name="R_hip">
-    <inertial><mass value="0.001"/><origin xyz="0 0 0"/>
-      <inertia ixx="1e-06" iyy="1e-06" izz="1e-06" ixy="0" ixz="0" iyz="0"/></inertial>
+  <!-- ============================ LEFT leg ============================= -->
+  <link name="l_hip">
+    <visual><geometry><mesh filename="../meshes/visual/l_hip.stl" scale="1 1 1"/></geometry><material name="joint"/></visual>
+    <collision><geometry><sphere radius="0.018"/></geometry></collision>
+    <inertial><mass value="0.05"/><inertia ixx="1e-5" iyy="1e-5" izz="1e-5" ixy="0" ixz="0" iyz="0"/></inertial>
   </link>
-  <joint name="R_hip_roll" type="revolute">   <!-- S13 hip-roll -->
-    <parent link="base_link"/><child link="R_hip"/>
-    <origin xyz="0 -0.045 -0.07" rpy="0 0 0"/>
+  <joint name="l_hip_roll" type="revolute">   <!-- S5 -->
+    <parent link="pelvis"/><child link="l_hip"/>
+    <origin xyz="0 0.033 -0.044" rpy="0 0 0"/>
     <axis xyz="1 0 0"/>
-    <limit lower="-0.6" upper="0.6" effort="4" velocity="6"/>
+    <limit lower="-1.047" upper="1.047" effort="2.0" velocity="4.0"/>
   </joint>
-  <link name="R_thigh">
-    <visual><origin xyz="0 0 -0.035" rpy="0 0 0"/>
-      <geometry><box size="0.03 0.03 0.07"/></geometry><material name="grey"/></visual>
-    <collision><origin xyz="0 0 -0.035" rpy="0 0 0"/>
-      <geometry><box size="0.03 0.03 0.07"/></geometry></collision>
-    <inertial><mass value="0.12"/><origin xyz="0 0 -0.035"/>
-      <inertia ixx="8e-05" iyy="8e-05" izz="2e-05" ixy="0" ixz="0" iyz="0"/></inertial>
+
+  <link name="l_thigh">
+    <visual><geometry><mesh filename="../meshes/visual/l_thigh.stl" scale="1 1 1"/></geometry><material name="shell"/></visual>
+    <collision><origin xyz="0 0 -0.030"/><geometry><cylinder radius="0.016" length="0.059"/></geometry></collision>
+    <inertial><mass value="0.12"/><inertia ixx="4e-5" iyy="4e-5" izz="1.5e-5" ixy="0" ixz="0" iyz="0"/></inertial>
   </link>
-  <joint name="R_hip_pitch" type="revolute">   <!-- S12 hip-pitch -->
-    <parent link="R_hip"/><child link="R_thigh"/>
-    <origin xyz="0 0 0" rpy="0 0 0"/>
+  <joint name="l_hip_pitch" type="revolute">   <!-- S4 -->
+    <parent link="l_hip"/><child link="l_thigh"/>
+    <origin xyz="0 0 -0.0465" rpy="0 0 0"/>
     <axis xyz="0 1 0"/>
-    <limit lower="-1.57" upper="1.57" effort="4" velocity="6"/>
+    <limit lower="-2.094" upper="2.094" effort="2.5" velocity="4.0"/>
   </joint>
-  <link name="R_shin">
-    <visual><origin xyz="0 0 -0.035" rpy="0 0 0"/>
-      <geometry><box size="0.028 0.028 0.07"/></geometry><material name="grey"/></visual>
-    <collision><origin xyz="0 0 -0.035" rpy="0 0 0"/>
-      <geometry><box size="0.028 0.028 0.07"/></geometry></collision>
-    <inertial><mass value="0.1"/><origin xyz="0 0 -0.035"/>
-      <inertia ixx="7e-05" iyy="7e-05" izz="2e-05" ixy="0" ixz="0" iyz="0"/></inertial>
+
+  <link name="l_shin">
+    <visual><geometry><mesh filename="../meshes/visual/l_shin.stl" scale="1 1 1"/></geometry><material name="accent"/></visual>
+    <collision><origin xyz="0 0 -0.029"/><geometry><cylinder radius="0.014" length="0.058"/></geometry></collision>
+    <inertial><mass value="0.10"/><inertia ixx="3.5e-5" iyy="3.5e-5" izz="1.2e-5" ixy="0" ixz="0" iyz="0"/></inertial>
   </link>
-  <joint name="R_knee" type="revolute">   <!-- S10+S11 knee (ganged) -->
-    <parent link="R_thigh"/><child link="R_shin"/>
-    <origin xyz="0 0 -0.07" rpy="0 0 0"/>
+  <joint name="l_knee" type="revolute">   <!-- S3 -->
+    <parent link="l_thigh"/><child link="l_shin"/>
+    <origin xyz="0 0 -0.059" rpy="0 0 0"/>
     <axis xyz="0 1 0"/>
-    <limit lower="0.0" upper="2.2" effort="4" velocity="6"/>
+    <limit lower="0.0" upper="2.094" effort="2.5" velocity="4.0"/>
   </joint>
-  <link name="R_foot">
-    <visual><origin xyz="0.015 0 -0.01" rpy="0 0 0"/>
-      <geometry><box size="0.07 0.04 0.02"/></geometry><material name="dark"/></visual>
-    <collision><origin xyz="0.015 0 -0.01" rpy="0 0 0"/>
-      <geometry><box size="0.07 0.04 0.02"/></geometry></collision>
-    <inertial><mass value="0.08"/><origin xyz="0.015 0 -0.01"/>
-      <inertia ixx="3e-05" iyy="6e-05" izz="7e-05" ixy="0" ixz="0" iyz="0"/></inertial>
+
+  <link name="l_ankle">
+    <visual><geometry><mesh filename="../meshes/visual/l_ankle.stl" scale="1 1 1"/></geometry><material name="joint"/></visual>
+    <collision><geometry><sphere radius="0.015"/></geometry></collision>
+    <inertial><mass value="0.04"/><inertia ixx="8e-6" iyy="8e-6" izz="8e-6" ixy="0" ixz="0" iyz="0"/></inertial>
   </link>
-  <joint name="R_ankle_pitch" type="revolute">   <!-- S9 ankle-pitch -->
-    <parent link="R_shin"/><child link="R_foot"/>
-    <origin xyz="0 0 -0.07" rpy="0 0 0"/>
+  <joint name="l_ankle_pitch" type="revolute">   <!-- S2 -->
+    <parent link="l_shin"/><child link="l_ankle"/>
+    <origin xyz="0 0 -0.058" rpy="0 0 0"/>
     <axis xyz="0 1 0"/>
-    <limit lower="-1.2" upper="1.2" effort="4" velocity="6"/>
+    <limit lower="-1.571" upper="1.571" effort="2.0" velocity="4.0"/>
+  </joint>
+
+  <link name="l_foot">
+    <visual><geometry><mesh filename="../meshes/visual/l_foot.stl" scale="1 1 1"/></geometry><material name="shell"/></visual>
+    <collision><origin xyz="0.015 0 -0.012"/><geometry><box size="0.075 0.045 0.018"/></geometry></collision>
+    <inertial><mass value="0.08"/><inertia ixx="2e-5" iyy="3e-5" izz="4e-5" ixy="0" ixz="0" iyz="0"/></inertial>
+  </link>
+  <joint name="l_ankle_roll" type="revolute">   <!-- S1 -->
+    <parent link="l_ankle"/><child link="l_foot"/>
+    <origin xyz="0 0 -0.0465" rpy="0 0 0"/>
+    <axis xyz="1 0 0"/>
+    <limit lower="-1.047" upper="1.047" effort="2.0" velocity="4.0"/>
+  </joint>
+
+  <!-- ============================ RIGHT leg ============================ -->
+  <link name="r_hip">
+    <visual><geometry><mesh filename="../meshes/visual/r_hip.stl" scale="1 1 1"/></geometry><material name="joint"/></visual>
+    <collision><geometry><sphere radius="0.018"/></geometry></collision>
+    <inertial><mass value="0.05"/><inertia ixx="1e-5" iyy="1e-5" izz="1e-5" ixy="0" ixz="0" iyz="0"/></inertial>
+  </link>
+  <joint name="r_hip_roll" type="revolute">   <!-- S13 -->
+    <parent link="pelvis"/><child link="r_hip"/>
+    <origin xyz="0 -0.033 -0.044" rpy="0 0 0"/>
+    <axis xyz="1 0 0"/>
+    <limit lower="-1.047" upper="1.047" effort="2.0" velocity="4.0"/>
+  </joint>
+
+  <link name="r_thigh">
+    <visual><geometry><mesh filename="../meshes/visual/r_thigh.stl" scale="1 1 1"/></geometry><material name="shell"/></visual>
+    <collision><origin xyz="0 0 -0.030"/><geometry><cylinder radius="0.016" length="0.059"/></geometry></collision>
+    <inertial><mass value="0.12"/><inertia ixx="4e-5" iyy="4e-5" izz="1.5e-5" ixy="0" ixz="0" iyz="0"/></inertial>
+  </link>
+  <joint name="r_hip_pitch" type="revolute">   <!-- S12 -->
+    <parent link="r_hip"/><child link="r_thigh"/>
+    <origin xyz="0 0 -0.0465" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/>
+    <limit lower="-2.094" upper="2.094" effort="2.5" velocity="4.0"/>
+  </joint>
+
+  <link name="r_shin">
+    <visual><geometry><mesh filename="../meshes/visual/r_shin.stl" scale="1 1 1"/></geometry><material name="accent"/></visual>
+    <collision><origin xyz="0 0 -0.029"/><geometry><cylinder radius="0.014" length="0.058"/></geometry></collision>
+    <inertial><mass value="0.10"/><inertia ixx="3.5e-5" iyy="3.5e-5" izz="1.2e-5" ixy="0" ixz="0" iyz="0"/></inertial>
+  </link>
+  <joint name="r_knee" type="revolute">   <!-- S11 -->
+    <parent link="r_thigh"/><child link="r_shin"/>
+    <origin xyz="0 0 -0.059" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/>
+    <limit lower="0.0" upper="2.094" effort="2.5" velocity="4.0"/>
+  </joint>
+
+  <link name="r_ankle">
+    <visual><geometry><mesh filename="../meshes/visual/r_ankle.stl" scale="1 1 1"/></geometry><material name="joint"/></visual>
+    <collision><geometry><sphere radius="0.015"/></geometry></collision>
+    <inertial><mass value="0.04"/><inertia ixx="8e-6" iyy="8e-6" izz="8e-6" ixy="0" ixz="0" iyz="0"/></inertial>
+  </link>
+  <joint name="r_ankle_pitch" type="revolute">   <!-- S10 -->
+    <parent link="r_shin"/><child link="r_ankle"/>
+    <origin xyz="0 0 -0.058" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/>
+    <limit lower="-1.571" upper="1.571" effort="2.0" velocity="4.0"/>
+  </joint>
+
+  <link name="r_foot">
+    <visual><geometry><mesh filename="../meshes/visual/r_foot.stl" scale="1 1 1"/></geometry><material name="shell"/></visual>
+    <collision><origin xyz="0.015 0 -0.012"/><geometry><box size="0.075 0.045 0.018"/></geometry></collision>
+    <inertial><mass value="0.08"/><inertia ixx="2e-5" iyy="3e-5" izz="4e-5" ixy="0" ixz="0" iyz="0"/></inertial>
+  </link>
+  <joint name="r_ankle_roll" type="revolute">   <!-- S9 -->
+    <parent link="r_ankle"/><child link="r_foot"/>
+    <origin xyz="0 0 -0.0465" rpy="0 0 0"/>
+    <axis xyz="1 0 0"/>
+    <limit lower="-1.047" upper="1.047" effort="2.0" velocity="4.0"/>
   </joint>
 
 </robot>

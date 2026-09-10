@@ -1,12 +1,24 @@
-<!-- Robot-only MJCF (kinematic tree, actuators, sensors, defaults).
+<!-- Robot-only MJCF (kinematic tree, meshes, actuators, sensors, defaults).
      No worldbody floor/lights/skybox here — those belong in scenes/*.xml.
-     Generated from ../urdf/TonyPi.urdf via ../../scripts/convert_urdf_to_mjcf.py, then hand-augmented:
-     - base_link wrapped in a body with a freejoint (URDF has no root joint, so MuJoCo
-       welds an unjointed root to the world and drops its mass/inertia — restored here).
-     - one position (PD) actuator per joint, matching the real bus servos' position control.
-       kp/kv/damping/armature below are placeholders — retune once real servo response is measured.
-     - 18 total joints (16 body + 2 head), including a wrist joint per arm (confirmed on the
-       real robot, no gripper/thumb). Wrist axis is an estimate, not yet verified.
+     Hand-converted from ../urdf/TonyPi.urdf (the WIGGLE-TEST-CONFIRMED mesh
+     layout, see that file's header for provenance/servo map):
+     - base_link/pelvis/torso are chained by fixed (jointless) MJCF bodies, same
+       as the URDF's `fixed` joints. base_link itself gets a <freejoint/> + a tiny
+       placeholder inertial (URDF has no root joint, so MuJoCo would otherwise
+       weld the whole robot rigidly to the world — restored here, same fix as
+       before).
+     - each body has TWO geoms: a `visual` mesh (contype/conaffinity 0, doesn't
+       collide, alpha 1) and a `collision` primitive (invisible, alpha 0, does
+       collide) — mirrors the URDF's visual/collision split. Box/cylinder sizes
+       below are HALVED from the URDF (URDF box/cylinder size = full extent,
+       MJCF geom size = half-extent).
+     - one position (PD) actuator per joint, matching the real bus servos'
+       position control. ctrlrange/actuatorfrcrange come from the URDF's
+       <limit>/effort. kp/kv/damping/armature below are placeholders — retune
+       once real servo response is measured.
+     - 18 total joints (16 body + 2 head): 3 DOF/arm (shoulder_pitch,
+       upperarm_roll, elbow — no wrist), 5 DOF/leg (hip_roll, hip_pitch, knee,
+       ankle_pitch, ankle_roll).
      Still TODO (separate pass): sensors, contact excludes. -->
 <mujoco model="tonypi">
   <compiler angle="radian"/>
@@ -16,125 +28,198 @@
       <joint damping="0.2" armature="0.01" frictionloss="0.05"/>
       <position kp="10" kv="0.5"/>
     </default>
+    <default class="visual">
+      <geom type="mesh" contype="0" conaffinity="0" group="1" density="0"/>
+    </default>
+    <default class="collision">
+      <geom group="3" rgba="0.5 0.5 0.5 0"/>
+    </default>
   </default>
+
+  <asset>
+    <mesh file="../meshes/visual/pelvis.stl"/>
+    <mesh file="../meshes/visual/neck.stl"/>
+    <mesh file="../meshes/visual/head.stl"/>
+    <mesh file="../meshes/visual/l_shoulder.stl"/>
+    <mesh file="../meshes/visual/l_upper_arm.stl"/>
+    <mesh file="../meshes/visual/l_forearm.stl"/>
+    <mesh file="../meshes/visual/r_shoulder.stl"/>
+    <mesh file="../meshes/visual/r_upper_arm.stl"/>
+    <mesh file="../meshes/visual/r_forearm.stl"/>
+    <mesh file="../meshes/visual/l_hip.stl"/>
+    <mesh file="../meshes/visual/l_thigh.stl"/>
+    <mesh file="../meshes/visual/l_shin.stl"/>
+    <mesh file="../meshes/visual/l_ankle.stl"/>
+    <mesh file="../meshes/visual/l_foot.stl"/>
+    <mesh file="../meshes/visual/r_hip.stl"/>
+    <mesh file="../meshes/visual/r_thigh.stl"/>
+    <mesh file="../meshes/visual/r_shin.stl"/>
+    <mesh file="../meshes/visual/r_ankle.stl"/>
+    <mesh file="../meshes/visual/r_foot.stl"/>
+  </asset>
 
   <worldbody>
     <body name="base_link">
       <freejoint/>
-      <inertial pos="0 0 0" mass="0.6" diaginertia="0.002 0.002 0.001"/>
-      <geom size="0.045 0.05 0.07" type="box" rgba="0.88 0.48 0 1"/>
+      <inertial pos="0 0 0" mass="0.001" diaginertia="1e-06 1e-06 1e-06"/>
 
-      <body name="neck" pos="0 0 0.075">
-        <inertial pos="0 0 0" mass="0.001" diaginertia="1e-06 1e-06 1e-06"/>
-        <joint name="neck_yaw" class="servo" range="-1.4 1.4" actuatorfrcrange="-4 4"/>
-        <body name="head" pos="0 0 0.03">
-          <inertial pos="0 0 0.03" mass="0.25" diaginertia="0.0003 0.0003 0.0003"/>
-          <joint name="head_pitch" class="servo" range="-0.7 0.7" actuatorfrcrange="-4 4" axis="0 1 0"/>
-          <geom size="0.03 0.035 0.03" pos="0 0 0.03" type="box" rgba="0.75 0.75 0.78 1"/>
+      <body name="pelvis" pos="0 0 0.267">
+        <geom class="visual" mesh="pelvis" rgba="0.93 0.93 0.95 1"/>
+        <geom class="collision" type="box" size="0.0375 0.045 0.025" pos="0 0 0.02"/>
+        <inertial pos="0 0 0" mass="0.60" diaginertia="8e-4 8e-4 6e-4"/>
+
+        <body name="torso" pos="0 0 0.05">
+          <geom class="collision" type="box" size="0.0425 0.05 0.0275" pos="0 0 0.025"/>
+          <inertial pos="0 0 0" mass="0.45" diaginertia="6e-4 6e-4 5e-4"/>
+
+          <body name="neck" pos="0 0 0.05">
+            <joint name="neck_yaw" class="servo" axis="0 0 1" range="-1.571 1.571" actuatorfrcrange="-1.0 1.0"/>
+            <geom class="visual" mesh="neck" rgba="0.15 0.16 0.18 1"/>
+            <geom class="collision" type="cylinder" size="0.012 0.015"/>
+            <inertial pos="0 0 0" mass="0.03" diaginertia="5e-6 5e-6 5e-6"/>
+
+            <body name="head" pos="0 0.006 0.02">
+              <joint name="head_pitch" class="servo" axis="0 1 0" range="-1.0 1.0" actuatorfrcrange="-1.0 1.0"/>
+              <geom class="visual" mesh="head" rgba="0.93 0.93 0.95 1"/>
+              <geom class="collision" type="box" size="0.035 0.0375 0.035" pos="0 0.01 0.03"/>
+              <inertial pos="0 0 0" mass="0.15" diaginertia="1.5e-4 1.5e-4 1.5e-4"/>
+            </body>
+          </body>
+
+          <body name="l_shoulder" pos="0 0.058 0.033">
+            <joint name="l_shoulder_pitch" class="servo" axis="0 1 0" range="-2.094 2.094" actuatorfrcrange="-1.5 1.5"/>
+            <geom class="visual" mesh="l_shoulder" rgba="0.15 0.16 0.18 1"/>
+            <geom class="collision" type="sphere" size="0.017"/>
+            <inertial pos="0 0 0" mass="0.04" diaginertia="8e-6 8e-6 8e-6"/>
+
+            <body name="l_upper_arm" pos="0 0 0">
+              <joint name="l_upperarm_roll" class="servo" axis="0 0 1" range="-2.094 2.094" actuatorfrcrange="-1.5 1.5"/>
+              <geom class="visual" mesh="l_upper_arm" rgba="0.93 0.93 0.95 1"/>
+              <geom class="collision" type="cylinder" size="0.014 0.029" pos="0 0 -0.029"/>
+              <inertial pos="0 0 0" mass="0.08" diaginertia="3e-5 1e-5 3e-5"/>
+
+              <body name="l_forearm" pos="0 0 -0.058">
+                <joint name="l_elbow" class="servo" axis="0 1 0" range="-2.094 2.094" actuatorfrcrange="-1.2 1.2"/>
+                <geom class="visual" mesh="l_forearm" rgba="0.20 0.55 0.95 1"/>
+                <geom class="collision" type="cylinder" size="0.012 0.0305" pos="0 0 -0.030"/>
+                <inertial pos="0 0 0" mass="0.06" diaginertia="2e-5 8e-6 2e-5"/>
+              </body>
+            </body>
+          </body>
+
+          <body name="r_shoulder" pos="0 -0.058 0.033">
+            <joint name="r_shoulder_pitch" class="servo" axis="0 1 0" range="-2.094 2.094" actuatorfrcrange="-1.5 1.5"/>
+            <geom class="visual" mesh="r_shoulder" rgba="0.15 0.16 0.18 1"/>
+            <geom class="collision" type="sphere" size="0.017"/>
+            <inertial pos="0 0 0" mass="0.04" diaginertia="8e-6 8e-6 8e-6"/>
+
+            <body name="r_upper_arm" pos="0 0 0">
+              <joint name="r_upperarm_roll" class="servo" axis="0 0 1" range="-2.094 2.094" actuatorfrcrange="-1.5 1.5"/>
+              <geom class="visual" mesh="r_upper_arm" rgba="0.93 0.93 0.95 1"/>
+              <geom class="collision" type="cylinder" size="0.014 0.029" pos="0 0 -0.029"/>
+              <inertial pos="0 0 0" mass="0.08" diaginertia="3e-5 1e-5 3e-5"/>
+
+              <body name="r_forearm" pos="0 0 -0.058">
+                <joint name="r_elbow" class="servo" axis="0 1 0" range="-2.094 2.094" actuatorfrcrange="-1.2 1.2"/>
+                <geom class="visual" mesh="r_forearm" rgba="0.20 0.55 0.95 1"/>
+                <geom class="collision" type="cylinder" size="0.012 0.0305" pos="0 0 -0.030"/>
+                <inertial pos="0 0 0" mass="0.06" diaginertia="2e-5 8e-6 2e-5"/>
+              </body>
+            </body>
+          </body>
         </body>
-      </body>
 
-      <body name="L_shoulder" pos="0 0.06 0.06">
-        <inertial pos="0 0 0" mass="0.001" diaginertia="1e-06 1e-06 1e-06"/>
-        <joint name="L_shoulder_pitch" class="servo" range="-2 2" actuatorfrcrange="-4 4" axis="0 1 0"/>
-        <body name="L_upper_arm">
-          <inertial pos="0 0.03 0" quat="0.707107 0.707107 0 0" mass="0.1" diaginertia="6e-05 6e-05 3e-05"/>
-          <joint name="L_shoulder_roll" class="servo" range="-2.6 2.6" actuatorfrcrange="-4 4" axis="1 0 0"/>
-          <geom size="0.0125 0.03 0.0125" pos="0 0.03 0" type="box" rgba="0.75 0.75 0.78 1"/>
-          <body name="L_forearm" pos="0 0.06 0">
-            <inertial pos="0 0.03 0" quat="0.707107 0.707107 0 0" mass="0.08" diaginertia="5e-05 5e-05 2e-05"/>
-            <joint name="L_elbow" class="servo" range="-2.4 2.4" actuatorfrcrange="-4 4"/>
-            <geom size="0.011 0.03 0.011" pos="0 0.03 0" type="box" rgba="0.2 0.2 0.22 1"/>
-            <body name="L_hand" pos="0 0.06 0">
-              <inertial pos="0 0.015 0" mass="0.05" diaginertia="2e-05 2e-05 2e-05"/>
-              <joint name="L_wrist" class="servo" range="-2 2" actuatorfrcrange="-4 4" axis="0 1 0"/>
-              <geom size="0.025 0.015 0.005" pos="0 0.015 0" type="box" rgba="0.2 0.2 0.22 1"/>
+        <body name="l_hip" pos="0 0.033 -0.044">
+          <joint name="l_hip_roll" class="servo" axis="1 0 0" range="-1.047 1.047" actuatorfrcrange="-2.0 2.0"/>
+          <geom class="visual" mesh="l_hip" rgba="0.15 0.16 0.18 1"/>
+          <geom class="collision" type="sphere" size="0.018"/>
+          <inertial pos="0 0 0" mass="0.05" diaginertia="1e-5 1e-5 1e-5"/>
+
+          <body name="l_thigh" pos="0 0 -0.0465">
+            <joint name="l_hip_pitch" class="servo" axis="0 1 0" range="-2.094 2.094" actuatorfrcrange="-2.5 2.5"/>
+            <geom class="visual" mesh="l_thigh" rgba="0.93 0.93 0.95 1"/>
+            <geom class="collision" type="cylinder" size="0.016 0.0295" pos="0 0 -0.030"/>
+            <inertial pos="0 0 0" mass="0.12" diaginertia="4e-5 4e-5 1.5e-5"/>
+
+            <body name="l_shin" pos="0 0 -0.059">
+              <joint name="l_knee" class="servo" axis="0 1 0" range="0.0 2.094" actuatorfrcrange="-2.5 2.5"/>
+              <geom class="visual" mesh="l_shin" rgba="0.20 0.55 0.95 1"/>
+              <geom class="collision" type="cylinder" size="0.014 0.029" pos="0 0 -0.029"/>
+              <inertial pos="0 0 0" mass="0.10" diaginertia="3.5e-5 3.5e-5 1.2e-5"/>
+
+              <body name="l_ankle" pos="0 0 -0.058">
+                <joint name="l_ankle_pitch" class="servo" axis="0 1 0" range="-1.571 1.571" actuatorfrcrange="-2.0 2.0"/>
+                <geom class="visual" mesh="l_ankle" rgba="0.15 0.16 0.18 1"/>
+                <geom class="collision" type="sphere" size="0.015"/>
+                <inertial pos="0 0 0" mass="0.04" diaginertia="8e-6 8e-6 8e-6"/>
+
+                <body name="l_foot" pos="0 0 -0.0465">
+                  <joint name="l_ankle_roll" class="servo" axis="1 0 0" range="-1.047 1.047" actuatorfrcrange="-2.0 2.0"/>
+                  <geom class="visual" mesh="l_foot" rgba="0.93 0.93 0.95 1"/>
+                  <geom class="collision" type="box" size="0.0375 0.0225 0.009" pos="0.015 0 -0.012"/>
+                  <inertial pos="0 0 0" mass="0.08" diaginertia="2e-5 3e-5 4e-5"/>
+                </body>
+              </body>
+            </body>
+          </body>
+        </body>
+
+        <body name="r_hip" pos="0 -0.033 -0.044">
+          <joint name="r_hip_roll" class="servo" axis="1 0 0" range="-1.047 1.047" actuatorfrcrange="-2.0 2.0"/>
+          <geom class="visual" mesh="r_hip" rgba="0.15 0.16 0.18 1"/>
+          <geom class="collision" type="sphere" size="0.018"/>
+          <inertial pos="0 0 0" mass="0.05" diaginertia="1e-5 1e-5 1e-5"/>
+
+          <body name="r_thigh" pos="0 0 -0.0465">
+            <joint name="r_hip_pitch" class="servo" axis="0 1 0" range="-2.094 2.094" actuatorfrcrange="-2.5 2.5"/>
+            <geom class="visual" mesh="r_thigh" rgba="0.93 0.93 0.95 1"/>
+            <geom class="collision" type="cylinder" size="0.016 0.0295" pos="0 0 -0.030"/>
+            <inertial pos="0 0 0" mass="0.12" diaginertia="4e-5 4e-5 1.5e-5"/>
+
+            <body name="r_shin" pos="0 0 -0.059">
+              <joint name="r_knee" class="servo" axis="0 1 0" range="0.0 2.094" actuatorfrcrange="-2.5 2.5"/>
+              <geom class="visual" mesh="r_shin" rgba="0.20 0.55 0.95 1"/>
+              <geom class="collision" type="cylinder" size="0.014 0.029" pos="0 0 -0.029"/>
+              <inertial pos="0 0 0" mass="0.10" diaginertia="3.5e-5 3.5e-5 1.2e-5"/>
+
+              <body name="r_ankle" pos="0 0 -0.058">
+                <joint name="r_ankle_pitch" class="servo" axis="0 1 0" range="-1.571 1.571" actuatorfrcrange="-2.0 2.0"/>
+                <geom class="visual" mesh="r_ankle" rgba="0.15 0.16 0.18 1"/>
+                <geom class="collision" type="sphere" size="0.015"/>
+                <inertial pos="0 0 0" mass="0.04" diaginertia="8e-6 8e-6 8e-6"/>
+
+                <body name="r_foot" pos="0 0 -0.0465">
+                  <joint name="r_ankle_roll" class="servo" axis="1 0 0" range="-1.047 1.047" actuatorfrcrange="-2.0 2.0"/>
+                  <geom class="visual" mesh="r_foot" rgba="0.93 0.93 0.95 1"/>
+                  <geom class="collision" type="box" size="0.0375 0.0225 0.009" pos="0.015 0 -0.012"/>
+                  <inertial pos="0 0 0" mass="0.08" diaginertia="2e-5 3e-5 4e-5"/>
+                </body>
+              </body>
             </body>
           </body>
         </body>
       </body>
-
-      <body name="R_shoulder" pos="0 -0.06 0.06">
-        <inertial pos="0 0 0" mass="0.001" diaginertia="1e-06 1e-06 1e-06"/>
-        <joint name="R_shoulder_pitch" class="servo" range="-2 2" actuatorfrcrange="-4 4" axis="0 1 0"/>
-        <body name="R_upper_arm">
-          <inertial pos="0 -0.03 0" quat="0.707107 0.707107 0 0" mass="0.1" diaginertia="6e-05 6e-05 3e-05"/>
-          <joint name="R_shoulder_roll" class="servo" range="-2.6 2.6" actuatorfrcrange="-4 4" axis="1 0 0"/>
-          <geom size="0.0125 0.03 0.0125" pos="0 -0.03 0" type="box" rgba="0.75 0.75 0.78 1"/>
-          <body name="R_forearm" pos="0 -0.06 0">
-            <inertial pos="0 -0.03 0" quat="0.707107 0.707107 0 0" mass="0.08" diaginertia="5e-05 5e-05 2e-05"/>
-            <joint name="R_elbow" class="servo" range="-2.4 2.4" actuatorfrcrange="-4 4"/>
-            <geom size="0.011 0.03 0.011" pos="0 -0.03 0" type="box" rgba="0.2 0.2 0.22 1"/>
-            <body name="R_hand" pos="0 -0.06 0">
-              <inertial pos="0 -0.015 0" mass="0.05" diaginertia="2e-05 2e-05 2e-05"/>
-              <joint name="R_wrist" class="servo" range="-2 2" actuatorfrcrange="-4 4" axis="0 1 0"/>
-              <geom size="0.025 0.015 0.005" pos="0 -0.015 0" type="box" rgba="0.2 0.2 0.22 1"/>
-            </body>
-          </body>
-        </body>
-      </body>
-
-      <body name="L_hip" pos="0 0.045 -0.07">
-        <inertial pos="0 0 0" mass="0.001" diaginertia="1e-06 1e-06 1e-06"/>
-        <joint name="L_hip_roll" class="servo" range="-0.6 0.6" actuatorfrcrange="-4 4" axis="1 0 0"/>
-        <body name="L_thigh">
-          <inertial pos="0 0 -0.035" mass="0.12" diaginertia="8e-05 8e-05 2e-05"/>
-          <joint name="L_hip_pitch" class="servo" range="-1.57 1.57" actuatorfrcrange="-4 4" axis="0 1 0"/>
-          <geom size="0.015 0.015 0.035" pos="0 0 -0.035" type="box" rgba="0.75 0.75 0.78 1"/>
-          <body name="L_shin" pos="0 0 -0.07">
-            <inertial pos="0 0 -0.035" mass="0.1" diaginertia="7e-05 7e-05 2e-05"/>
-            <joint name="L_knee" class="servo" range="0 2.2" actuatorfrcrange="-4 4" axis="0 1 0"/>
-            <geom size="0.014 0.014 0.035" pos="0 0 -0.035" type="box" rgba="0.75 0.75 0.78 1"/>
-            <body name="L_foot" pos="0 0 -0.07">
-              <inertial pos="0.015 0 -0.01" quat="0 0.707107 0 0.707107" mass="0.08" diaginertia="7e-05 6e-05 3e-05"/>
-              <joint name="L_ankle_pitch" class="servo" range="-1.2 1.2" actuatorfrcrange="-4 4" axis="0 1 0"/>
-              <geom size="0.035 0.02 0.01" pos="0.015 0 -0.01" type="box" rgba="0.2 0.2 0.22 1"/>
-            </body>
-          </body>
-        </body>
-      </body>
-
-      <body name="R_hip" pos="0 -0.045 -0.07">
-        <inertial pos="0 0 0" mass="0.001" diaginertia="1e-06 1e-06 1e-06"/>
-        <joint name="R_hip_roll" class="servo" range="-0.6 0.6" actuatorfrcrange="-4 4" axis="1 0 0"/>
-        <body name="R_thigh">
-          <inertial pos="0 0 -0.035" mass="0.12" diaginertia="8e-05 8e-05 2e-05"/>
-          <joint name="R_hip_pitch" class="servo" range="-1.57 1.57" actuatorfrcrange="-4 4" axis="0 1 0"/>
-          <geom size="0.015 0.015 0.035" pos="0 0 -0.035" type="box" rgba="0.75 0.75 0.78 1"/>
-          <body name="R_shin" pos="0 0 -0.07">
-            <inertial pos="0 0 -0.035" mass="0.1" diaginertia="7e-05 7e-05 2e-05"/>
-            <joint name="R_knee" class="servo" range="0 2.2" actuatorfrcrange="-4 4" axis="0 1 0"/>
-            <geom size="0.014 0.014 0.035" pos="0 0 -0.035" type="box" rgba="0.75 0.75 0.78 1"/>
-            <body name="R_foot" pos="0 0 -0.07">
-              <inertial pos="0.015 0 -0.01" quat="0 0.707107 0 0.707107" mass="0.08" diaginertia="7e-05 6e-05 3e-05"/>
-              <joint name="R_ankle_pitch" class="servo" range="-1.2 1.2" actuatorfrcrange="-4 4" axis="0 1 0"/>
-              <geom size="0.035 0.02 0.01" pos="0.015 0 -0.01" type="box" rgba="0.2 0.2 0.22 1"/>
-            </body>
-          </body>
-        </body>
-      </body>
-
     </body>
   </worldbody>
 
   <actuator>
-    <position name="neck_yaw" class="servo" joint="neck_yaw" ctrlrange="-1.4 1.4"/>
-    <position name="head_pitch" class="servo" joint="head_pitch" ctrlrange="-0.7 0.7"/>
-    <position name="L_shoulder_pitch" class="servo" joint="L_shoulder_pitch" ctrlrange="-2 2"/>
-    <position name="L_shoulder_roll" class="servo" joint="L_shoulder_roll" ctrlrange="-2.6 2.6"/>
-    <position name="L_elbow" class="servo" joint="L_elbow" ctrlrange="-2.4 2.4"/>
-    <position name="L_wrist" class="servo" joint="L_wrist" ctrlrange="-2 2"/>
-    <position name="R_shoulder_pitch" class="servo" joint="R_shoulder_pitch" ctrlrange="-2 2"/>
-    <position name="R_shoulder_roll" class="servo" joint="R_shoulder_roll" ctrlrange="-2.6 2.6"/>
-    <position name="R_elbow" class="servo" joint="R_elbow" ctrlrange="-2.4 2.4"/>
-    <position name="R_wrist" class="servo" joint="R_wrist" ctrlrange="-2 2"/>
-    <position name="L_hip_roll" class="servo" joint="L_hip_roll" ctrlrange="-0.6 0.6"/>
-    <position name="L_hip_pitch" class="servo" joint="L_hip_pitch" ctrlrange="-1.57 1.57"/>
-    <position name="L_knee" class="servo" joint="L_knee" ctrlrange="0 2.2"/>
-    <position name="L_ankle_pitch" class="servo" joint="L_ankle_pitch" ctrlrange="-1.2 1.2"/>
-    <position name="R_hip_roll" class="servo" joint="R_hip_roll" ctrlrange="-0.6 0.6"/>
-    <position name="R_hip_pitch" class="servo" joint="R_hip_pitch" ctrlrange="-1.57 1.57"/>
-    <position name="R_knee" class="servo" joint="R_knee" ctrlrange="0 2.2"/>
-    <position name="R_ankle_pitch" class="servo" joint="R_ankle_pitch" ctrlrange="-1.2 1.2"/>
+    <position name="neck_yaw" class="servo" joint="neck_yaw" ctrlrange="-1.571 1.571"/>
+    <position name="head_pitch" class="servo" joint="head_pitch" ctrlrange="-1.0 1.0"/>
+    <position name="l_shoulder_pitch" class="servo" joint="l_shoulder_pitch" ctrlrange="-2.094 2.094"/>
+    <position name="l_upperarm_roll" class="servo" joint="l_upperarm_roll" ctrlrange="-2.094 2.094"/>
+    <position name="l_elbow" class="servo" joint="l_elbow" ctrlrange="-2.094 2.094"/>
+    <position name="r_shoulder_pitch" class="servo" joint="r_shoulder_pitch" ctrlrange="-2.094 2.094"/>
+    <position name="r_upperarm_roll" class="servo" joint="r_upperarm_roll" ctrlrange="-2.094 2.094"/>
+    <position name="r_elbow" class="servo" joint="r_elbow" ctrlrange="-2.094 2.094"/>
+    <position name="l_hip_roll" class="servo" joint="l_hip_roll" ctrlrange="-1.047 1.047"/>
+    <position name="l_hip_pitch" class="servo" joint="l_hip_pitch" ctrlrange="-2.094 2.094"/>
+    <position name="l_knee" class="servo" joint="l_knee" ctrlrange="0.0 2.094"/>
+    <position name="l_ankle_pitch" class="servo" joint="l_ankle_pitch" ctrlrange="-1.571 1.571"/>
+    <position name="l_ankle_roll" class="servo" joint="l_ankle_roll" ctrlrange="-1.047 1.047"/>
+    <position name="r_hip_roll" class="servo" joint="r_hip_roll" ctrlrange="-1.047 1.047"/>
+    <position name="r_hip_pitch" class="servo" joint="r_hip_pitch" ctrlrange="-2.094 2.094"/>
+    <position name="r_knee" class="servo" joint="r_knee" ctrlrange="0.0 2.094"/>
+    <position name="r_ankle_pitch" class="servo" joint="r_ankle_pitch" ctrlrange="-1.571 1.571"/>
+    <position name="r_ankle_roll" class="servo" joint="r_ankle_roll" ctrlrange="-1.047 1.047"/>
   </actuator>
 </mujoco>

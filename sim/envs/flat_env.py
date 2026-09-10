@@ -12,7 +12,10 @@ from gymnasium.spaces import Box
 DEFAULT_MODEL_PATH = str(
     Path(__file__).resolve().parent.parent / "description" / "mjcf" / "scenes" / "flat_ground.xml"
 )
-HEALTHY_Z_RANGE = (0.12, 0.35)  # base height bounds outside which the episode ends
+# pelvis (not base_link) height bounds outside which the episode ends: base_link
+# sits at floor level in this model (pelvis is +0.267m above it), so it isn't a
+# useful upright/fallen signal on its own. Standing pelvis height is ~0.275m.
+HEALTHY_Z_RANGE = (0.15, 0.35)
 
 
 class TonyPiFlatEnv(MujocoEnv, utils.EzPickle):
@@ -54,6 +57,8 @@ class TonyPiFlatEnv(MujocoEnv, utils.EzPickle):
         if home_id != -1:
             self.init_qpos = self.model.key_qpos[home_id].copy()
 
+        self._pelvis_body_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_BODY, "pelvis")
+
     def _get_obs(self):
         position = self.data.qpos.flatten()[2:]  # drop x,y: translation-invariant obs
         velocity = self.data.qvel.flatten()
@@ -62,7 +67,8 @@ class TonyPiFlatEnv(MujocoEnv, utils.EzPickle):
     @property
     def is_healthy(self) -> bool:
         min_z, max_z = self._healthy_z_range
-        return min_z < self.data.qpos[2] < max_z
+        pelvis_z = self.data.xpos[self._pelvis_body_id, 2]
+        return min_z < pelvis_z < max_z
 
     def step(self, action):
         x_before = self.data.qpos[0]

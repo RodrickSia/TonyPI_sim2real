@@ -8,3 +8,6 @@ wheels/
 
 # Virtual environments
 .venv
+
+# PPO training outputs (checkpoints, tensorboard logs, monitor CSVs)
+runs/

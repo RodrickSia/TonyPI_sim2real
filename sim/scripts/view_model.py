@@ -18,13 +18,13 @@ def main() -> None:
                          help="keyframe name to reset to on load, if present (default: home)")
     args = parser.parse_args()
 
-    model = mujoco.MjModel.from_xml_path(str(args.model))
-    data = mujoco.MjData(model)
+    model = mujoco.MjModel.from_xml_path(str(args.model)) # type: ignore[attr-defined] 
+    data = mujoco.MjData(model) # type: ignore[attr-defined] 
 
-    key_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_KEY, args.keyframe)
+    key_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_KEY, args.keyframe) # type: ignore[attr-defined] 
     if key_id >= 0:
-        mujoco.mj_resetDataKeyframe(model, data, key_id)
-        mujoco.mj_forward(model, data)
+        mujoco.mj_resetDataKeyframe(model, data, key_id) # type: ignore[attr-defined] 
+        mujoco.mj_forward(model, data) # type: ignore[attr-defined] 
 
     mujoco.viewer.launch(model, data)
 

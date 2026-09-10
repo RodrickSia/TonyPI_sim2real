@@ -1,0 +1,17 @@
+# Hyperparameters for the flat-ground walking task (TonyPiFlat-v0).
+# See sim/train/ppo.py:PPOConfig for the meaning of each field.
+env_id: TonyPiFlat-v0
+run_name: ppo_flat
+total_timesteps: 5000000
+n_envs: 8
+n_steps: 2048
+batch_size: 256
+n_epochs: 10
+learning_rate: 0.0003
+gamma: 0.99
+gae_lambda: 0.95
+clip_range: 0.2
+ent_coef: 0.0
+checkpoint_freq: 200000
+net_arch: [256, 256]
+seed: 0
