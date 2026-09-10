@@ -4,8 +4,9 @@ env_id: TonyPiFlat-v0
 run_name: ppo_flat
 total_timesteps: 5000000
 n_envs: 8
+subproc: true
 n_steps: 2048
-batch_size: 256
+batch_size: 1024  # divides n_steps*n_envs=16384 evenly
 n_epochs: 10
 learning_rate: 0.0003
 gamma: 0.99
@@ -13,5 +14,9 @@ gae_lambda: 0.95
 clip_range: 0.2
 ent_coef: 0.0
 checkpoint_freq: 200000
-net_arch: [256, 256]
+net_arch: [512, 512]
 seed: 0
+normalize: true
+eval_freq: 50000
+n_eval_episodes: 5
+progress_bar: true

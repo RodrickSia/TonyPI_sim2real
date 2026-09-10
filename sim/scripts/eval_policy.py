@@ -13,6 +13,7 @@ sys.path.insert(0, str(REPO_ROOT))  # allow `import sim.*` when run as a standal
 
 import gymnasium as gym
 from stable_baselines3 import PPO
+from stable_baselines3.common.vec_env import DummyVecEnv, VecNormalize
 
 import sim.envs  # noqa: E402, F401 registers TonyPiFlat-v0 with gymnasium
 
@@ -27,14 +28,32 @@ def main() -> None:
     env = gym.make(args.env_id, render_mode="human")
     model = PPO.load(args.model_path)
 
+    # if the run saved VecNormalize stats (sim/train/ppo.py does, when normalize=true),
+    # apply the same obs normalization at inference -- otherwise the policy sees
+    # out-of-distribution observations and behaves poorly. Stats live in the run
+    # dir itself, so check both model_path's own dir (final_model.zip) and its
+    # parent's parent (best_model/best_model.zip, checkpoints/ppo_*_steps.zip).
+    candidates = [args.model_path.parent / "vecnormalize.pkl", args.model_path.parent.parent / "vecnormalize.pkl"]
+    vecnormalize_path = next((p for p in candidates if p.exists()), None)
+    vec_env = None
+    if vecnormalize_path is not None:
+        vec_env = VecNormalize.load(str(vecnormalize_path), DummyVecEnv([lambda: env]))
+        vec_env.training = False
+        vec_env.norm_reward = False
+
     for ep in range(args.episodes):
-        obs, _ = env.reset()
+        obs, _ = (vec_env.reset(), None) if vec_env is not None else env.reset()
         done = False
         ep_reward = 0.0
         while not done:
             action, _ = model.predict(obs, deterministic=True)
-            obs, reward, terminated, truncated, _ = env.step(action)
-            done = terminated or truncated
+            if vec_env is not None:
+                obs, reward, done_arr, _ = vec_env.step(action)
+                done = bool(done_arr[0])
+                reward = reward[0]
+            else:
+                obs, reward, terminated, truncated, _ = env.step(action)
+                done = terminated or truncated
             ep_reward += reward
         print(f"episode {ep}: reward={ep_reward:.2f}")
 

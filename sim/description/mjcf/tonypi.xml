@@ -19,7 +19,12 @@
      - 18 total joints (16 body + 2 head): 3 DOF/arm (shoulder_pitch,
        upperarm_roll, elbow — no wrist), 5 DOF/leg (hip_roll, hip_pitch, knee,
        ankle_pitch, ankle_roll).
-     Still TODO (separate pass): sensors, contact excludes. -->
+     - <contact><exclude .../></contact> below turns off collision for body
+       pairs that rest against each other by design at zero pose (arms hang
+       right next to the torso/pelvis, forearms right next to the hips) — left
+       enabled, these fought the PD actuators with constant contact forces,
+       making the arms/legs feel sluggish/"stuck" instead of tracking ctrl.
+     Still TODO (separate pass): sensors. -->
 <mujoco model="tonypi">
   <compiler angle="radian"/>
 
@@ -201,6 +206,15 @@
       </body>
     </body>
   </worldbody>
+
+  <contact>
+    <exclude body1="l_upper_arm" body2="pelvis"/>
+    <exclude body1="l_upper_arm" body2="torso"/>
+    <exclude body1="r_upper_arm" body2="pelvis"/>
+    <exclude body1="r_upper_arm" body2="torso"/>
+    <exclude body1="l_forearm" body2="l_hip"/>
+    <exclude body1="r_forearm" body2="r_hip"/>
+  </contact>
 
   <actuator>
     <position name="neck_yaw" class="servo" joint="neck_yaw" ctrlrange="-1.571 1.571"/>
