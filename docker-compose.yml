@@ -1,0 +1,7 @@
+services:
+  train:
+    build: .
+    volumes:
+      - ./runs:/workspace/runs
+    # override the config / add flags, e.g.:
+    # command: ["--config", "configs/ppo_flat.yaml", "--run-name", "my_run"]

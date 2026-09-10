@@ -1,0 +1,11 @@
+.git/
+.venv/
+runs/
+assets/
+data/
+docs/
+models/
+control/
+infra/
+**/__pycache__/
+*.pyc
