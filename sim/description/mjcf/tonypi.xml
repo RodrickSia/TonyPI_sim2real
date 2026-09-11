@@ -70,23 +70,25 @@
 
       <body name="pelvis" pos="0 0 0.267">
         <geom class="visual" mesh="pelvis" rgba="0.93 0.93 0.95 1"/>
-        <geom class="collision" type="box" size="0.0375 0.045 0.025" pos="0 0 0.02"/>
+        <geom class="collision" type="box" size="0.053 0.058 0.052" pos="-0.011 0 -0.002"/>
         <inertial pos="0 0 0" mass="0.60" diaginertia="8e-4 8e-4 6e-4"/>
 
         <body name="torso" pos="0 0 0.05">
-          <geom class="collision" type="box" size="0.0425 0.05 0.0275" pos="0 0 0.025"/>
+          <!-- no collision geom: this body has no visual of its own, and the region it
+               occupies is already covered by the pelvis mesh below and the neck mesh
+               above. A box here was a phantom collider floating in the head region. -->
           <inertial pos="0 0 0" mass="0.45" diaginertia="6e-4 6e-4 5e-4"/>
 
           <body name="neck" pos="0 0 0.05">
             <joint name="neck_yaw" class="servo" axis="0 0 1" range="-1.571 1.571" actuatorfrcrange="-1.0 1.0"/>
             <geom class="visual" mesh="neck" rgba="0.15 0.16 0.18 1"/>
-            <geom class="collision" type="cylinder" size="0.012 0.015"/>
+            <geom class="collision" type="cylinder" size="0.016 0.019" pos="0.0045 0 -0.031"/>
             <inertial pos="0 0 0" mass="0.03" diaginertia="5e-6 5e-6 5e-6"/>
 
             <body name="head" pos="0 0.006 0.02">
               <joint name="head_pitch" class="servo" axis="0 1 0" range="-1.0 1.0" actuatorfrcrange="-1.0 1.0"/>
               <geom class="visual" mesh="head" rgba="0.93 0.93 0.95 1"/>
-              <geom class="collision" type="box" size="0.035 0.0375 0.035" pos="0 0.01 0.03"/>
+              <geom class="collision" type="box" size="0.032 0.025 0.025" pos="0.010 -0.006 -0.026"/>
               <inertial pos="0 0 0" mass="0.15" diaginertia="1.5e-4 1.5e-4 1.5e-4"/>
             </body>
           </body>
@@ -184,7 +186,9 @@
                 <body name="l_foot" pos="0 0 -0.0465">
                   <joint name="l_ankle_roll" class="servo" axis="1 0 0" range="-1.047 1.047" actuatorfrcrange="-2.0 2.0"/>
                   <geom class="visual" mesh="l_foot" rgba="0.93 0.93 0.95 1"/>
-                  <geom class="collision" type="box" size="0.0375 0.0225 0.009" pos="0.015 0 -0.012"/>
+                  <!-- sized to the foot mesh footprint; the old box was ~half the sole area
+                       and sat 7mm below it, so the visual foot floated above the ground. -->
+                  <geom class="collision" type="box" size="0.0575 0.0395 0.012" pos="0.0015 0.0125 -0.002"/>
                   <inertial pos="0 0 0" mass="0.08" diaginertia="2e-5 3e-5 4e-5"/>
                 </body>
               </body>
@@ -219,7 +223,8 @@
                 <body name="r_foot" pos="0 0 -0.0465">
                   <joint name="r_ankle_roll" class="servo" axis="1 0 0" range="-1.047 1.047" actuatorfrcrange="-2.0 2.0"/>
                   <geom class="visual" mesh="r_foot" rgba="0.93 0.93 0.95 1"/>
-                  <geom class="collision" type="box" size="0.0375 0.0225 0.009" pos="0.015 0 -0.012"/>
+                  <!-- mirrored in Y, see l_foot above -->
+                  <geom class="collision" type="box" size="0.0575 0.0395 0.012" pos="-0.0015 -0.0125 -0.002"/>
                   <inertial pos="0 0 0" mass="0.08" diaginertia="2e-5 3e-5 4e-5"/>
                 </body>
               </body>

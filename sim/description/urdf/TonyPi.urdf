@@ -60,7 +60,7 @@
       <geometry><mesh filename="../meshes/visual/pelvis.stl" scale="1 1 1"/></geometry>
       <material name="shell"/>
     </visual>
-    <collision><origin xyz="0 0 0.02"/><geometry><box size="0.075 0.09 0.05"/></geometry></collision>
+    <collision><origin xyz="-0.011 0 -0.002"/><geometry><box size="0.106 0.116 0.104"/></geometry></collision>
     <inertial>
       <mass value="0.60"/>
       <inertia ixx="8e-4" iyy="8e-4" izz="6e-4" ixy="0" ixz="0" iyz="0"/>
@@ -68,7 +68,8 @@
   </link>
 
   <link name="torso">
-    <collision><origin xyz="0 0 0.025"/><geometry><box size="0.085 0.10 0.055"/></geometry></collision>
+    <!-- no collision: this link has no visual of its own and the region it occupies is
+         already covered by the pelvis mesh below and the neck mesh above. -->
     <inertial><mass value="0.45"/><inertia ixx="6e-4" iyy="6e-4" izz="5e-4" ixy="0" ixz="0" iyz="0"/></inertial>
   </link>
   <joint name="spine_fixed" type="fixed">
@@ -79,7 +80,7 @@
   <!-- ============================ head ================================= -->
   <link name="neck">
     <visual><geometry><mesh filename="../meshes/visual/neck.stl" scale="1 1 1"/></geometry><material name="joint"/></visual>
-    <collision><geometry><cylinder radius="0.012" length="0.030"/></geometry></collision>
+    <collision><origin xyz="0.0045 0 -0.031"/><geometry><cylinder radius="0.016" length="0.038"/></geometry></collision>
     <inertial><mass value="0.03"/><inertia ixx="5e-6" iyy="5e-6" izz="5e-6" ixy="0" ixz="0" iyz="0"/></inertial>
   </link>
   <joint name="neck_yaw" type="revolute">   <!-- PWM2 head pan -->
@@ -91,7 +92,7 @@
 
   <link name="head">
     <visual><geometry><mesh filename="../meshes/visual/head.stl" scale="1 1 1"/></geometry><material name="shell"/></visual>
-    <collision><origin xyz="0 0.01 0.03"/><geometry><box size="0.07 0.075 0.07"/></geometry></collision>
+    <collision><origin xyz="0.010 -0.006 -0.026"/><geometry><box size="0.064 0.050 0.050"/></geometry></collision>
     <inertial><mass value="0.15"/><inertia ixx="1.5e-4" iyy="1.5e-4" izz="1.5e-4" ixy="0" ixz="0" iyz="0"/></inertial>
   </link>
   <joint name="head_pitch" type="revolute">   <!-- PWM1 head tilt -->
@@ -245,7 +246,9 @@
 
   <link name="l_foot">
     <visual><geometry><mesh filename="../meshes/visual/l_foot.stl" scale="1 1 1"/></geometry><material name="shell"/></visual>
-    <collision><origin xyz="0.015 0 -0.012"/><geometry><box size="0.075 0.045 0.018"/></geometry></collision>
+    <!-- sized to the foot mesh footprint; the old box was ~half the sole area and sat
+         7mm below it, so the visual foot floated above the ground. -->
+    <collision><origin xyz="0.0015 0.0125 -0.002"/><geometry><box size="0.115 0.079 0.024"/></geometry></collision>
     <inertial><mass value="0.08"/><inertia ixx="2e-5" iyy="3e-5" izz="4e-5" ixy="0" ixz="0" iyz="0"/></inertial>
   </link>
   <joint name="l_ankle_roll" type="revolute">   <!-- S1 -->
@@ -306,7 +309,8 @@
 
   <link name="r_foot">
     <visual><geometry><mesh filename="../meshes/visual/r_foot.stl" scale="1 1 1"/></geometry><material name="shell"/></visual>
-    <collision><origin xyz="0.015 0 -0.012"/><geometry><box size="0.075 0.045 0.018"/></geometry></collision>
+    <!-- mirrored in Y, see l_foot above -->
+    <collision><origin xyz="-0.0015 -0.0125 -0.002"/><geometry><box size="0.115 0.079 0.024"/></geometry></collision>
     <inertial><mass value="0.08"/><inertia ixx="2e-5" iyy="3e-5" izz="4e-5" ixy="0" ixz="0" iyz="0"/></inertial>
   </link>
   <joint name="r_ankle_roll" type="revolute">   <!-- S9 -->
