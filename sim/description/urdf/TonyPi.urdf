@@ -23,6 +23,12 @@
   *meaning* changed; anything referencing old names (L_wrist, L_shoulder_roll,
   no L_ankle_roll) needs updating.
 
+  CORRECTION vs. the doc (verified against the real robot after import): the doc's
+  upperarm_roll axis (Z, a pure twist) did not match the real servo's motion --
+  it actually lifts the arm sideways (abduction). Fixed to X on the left arm and
+  mirrored -X on the right arm (see l_upperarm_roll/r_upperarm_roll below).
+  shoulder_pitch's Y axis (fwd/back swing) was already correct, unchanged.
+
   Convention: ROS standard Z up, X forward, Y left.
 -->
 <robot name="tonypi">
@@ -97,75 +103,94 @@
 
   <!-- ============================ LEFT arm ============================= -->
   <link name="l_shoulder">
-    <visual><geometry><mesh filename="../meshes/visual/l_shoulder.stl" scale="1 1 1"/></geometry><material name="joint"/></visual>
+    <visual><origin xyz="0 -0.0169 0.054"/><geometry><mesh filename="../meshes/visual/l_shoulder.stl" scale="1 1 1"/></geometry><material name="joint"/></visual>
     <collision><geometry><sphere radius="0.017"/></geometry></collision>
     <inertial><mass value="0.04"/><inertia ixx="8e-6" iyy="8e-6" izz="8e-6" ixy="0" ixz="0" iyz="0"/></inertial>
   </link>
+  <!-- range narrowed from the servo's full +/-2.094 mechanical limit -- the full
+       range swings the arm through an unnaturally wide arc, far from the body. -->
+  <!-- z lowered 0.054 from the doc's 0.033: the doc's estimate put the rotation axis
+       ~5.4cm above the mesh-derived shoulder, so raising the arm swung it out in a wide
+       arc instead of pivoting in place. The visuals carry a matching +0.054 origin so
+       the arm stays put in space; only the rotation axis moved. -->
   <joint name="l_shoulder_pitch" type="revolute">   <!-- S8 -->
     <parent link="torso"/><child link="l_shoulder"/>
-    <origin xyz="0 0.058 0.033" rpy="0 0 0"/>
+    <origin xyz="0 0.0749 -0.021" rpy="0 0 0"/>
     <axis xyz="0 1 0"/>
-    <limit lower="-2.094" upper="2.094" effort="1.5" velocity="4.0"/>
+    <limit lower="-1.2" upper="1.2" effort="1.5" velocity="4.0"/>
   </joint>
 
   <link name="l_upper_arm">
-    <visual><geometry><mesh filename="../meshes/visual/l_upper_arm.stl" scale="1 1 1"/></geometry><material name="shell"/></visual>
+    <visual><origin xyz="0 -0.0299 0.054"/><geometry><mesh filename="../meshes/visual/l_upper_arm.stl" scale="1 1 1"/></geometry><material name="shell"/></visual>
     <collision><origin xyz="0 0 -0.029"/><geometry><cylinder radius="0.014" length="0.058"/></geometry></collision>
     <inertial><mass value="0.08"/><inertia ixx="3e-5" iyy="1e-5" izz="3e-5" ixy="0" ixz="0" iyz="0"/></inertial>
   </link>
-  <joint name="l_upperarm_roll" type="revolute">   <!-- S7, roll about the hanging arm's own axis (Z) -->
+  <!-- S7. axis corrected to X (sideways lift/abduction) -- verified against the real
+       robot; doc said Z (twist only, no lift), which did not match actual motion. -->
+  <joint name="l_upperarm_roll" type="revolute">
     <parent link="l_shoulder"/><child link="l_upper_arm"/>
-    <origin xyz="0 0 0" rpy="0 0 0"/>
-    <axis xyz="0 0 1"/>
-    <limit lower="-2.094" upper="2.094" effort="1.5" velocity="4.0"/>
+    <origin xyz="0 0.013 0" rpy="0 0 0"/>
+    <axis xyz="1 0 0"/>
+    <limit lower="-1.3" upper="1.3" effort="1.5" velocity="4.0"/>
   </joint>
 
   <link name="l_forearm">
-    <visual><geometry><mesh filename="../meshes/visual/l_forearm.stl" scale="1 1 1"/></geometry><material name="accent"/></visual>
+    <visual><origin xyz="0 -0.0299 0.054"/><geometry><mesh filename="../meshes/visual/l_forearm.stl" scale="1 1 1"/></geometry><material name="accent"/></visual>
     <collision><origin xyz="0 0 -0.030"/><geometry><cylinder radius="0.012" length="0.061"/></geometry></collision>
+    <!-- the forearm mesh includes the hand; the cylinder above only covers the shaft,
+         so this box covers the hand at the far end. -->
+    <collision><origin xyz="0 0 -0.086"/><geometry><box size="0.057 0.038 0.0506"/></geometry></collision>
     <inertial><mass value="0.06"/><inertia ixx="2e-5" iyy="8e-6" izz="2e-5" ixy="0" ixz="0" iyz="0"/></inertial>
   </link>
   <joint name="l_elbow" type="revolute">   <!-- S6 -->
     <parent link="l_upper_arm"/><child link="l_forearm"/>
     <origin xyz="0 0 -0.058" rpy="0 0 0"/>
-    <axis xyz="0 1 0"/>
+    <axis xyz="1 0 0"/>
     <limit lower="-2.094" upper="2.094" effort="1.2" velocity="4.0"/>
   </joint>
 
   <!-- ============================ RIGHT arm ============================ -->
   <link name="r_shoulder">
-    <visual><geometry><mesh filename="../meshes/visual/r_shoulder.stl" scale="1 1 1"/></geometry><material name="joint"/></visual>
+    <visual><origin xyz="0 0.0169 0.054"/><geometry><mesh filename="../meshes/visual/r_shoulder.stl" scale="1 1 1"/></geometry><material name="joint"/></visual>
     <collision><geometry><sphere radius="0.017"/></geometry></collision>
     <inertial><mass value="0.04"/><inertia ixx="8e-6" iyy="8e-6" izz="8e-6" ixy="0" ixz="0" iyz="0"/></inertial>
   </link>
+  <!-- range narrowed, see l_shoulder_pitch above -->
+  <!-- z lowered 0.054, see l_shoulder_pitch above -->
   <joint name="r_shoulder_pitch" type="revolute">   <!-- S16 -->
     <parent link="torso"/><child link="r_shoulder"/>
-    <origin xyz="0 -0.058 0.033" rpy="0 0 0"/>
+    <origin xyz="0 -0.0749 -0.021" rpy="0 0 0"/>
     <axis xyz="0 1 0"/>
-    <limit lower="-2.094" upper="2.094" effort="1.5" velocity="4.0"/>
+    <limit lower="-1.2" upper="1.2" effort="1.5" velocity="4.0"/>
   </joint>
 
   <link name="r_upper_arm">
-    <visual><geometry><mesh filename="../meshes/visual/r_upper_arm.stl" scale="1 1 1"/></geometry><material name="shell"/></visual>
+    <visual><origin xyz="0 0.0299 0.054"/><geometry><mesh filename="../meshes/visual/r_upper_arm.stl" scale="1 1 1"/></geometry><material name="shell"/></visual>
     <collision><origin xyz="0 0 -0.029"/><geometry><cylinder radius="0.014" length="0.058"/></geometry></collision>
     <inertial><mass value="0.08"/><inertia ixx="3e-5" iyy="1e-5" izz="3e-5" ixy="0" ixz="0" iyz="0"/></inertial>
   </link>
-  <joint name="r_upperarm_roll" type="revolute">   <!-- S15 -->
+  <!-- S15. axis mirrored (-X) vs the left arm so a positive angle lifts both arms
+       outward/up symmetrically -->
+  <joint name="r_upperarm_roll" type="revolute">
     <parent link="r_shoulder"/><child link="r_upper_arm"/>
-    <origin xyz="0 0 0" rpy="0 0 0"/>
-    <axis xyz="0 0 1"/>
-    <limit lower="-2.094" upper="2.094" effort="1.5" velocity="4.0"/>
+    <origin xyz="0 -0.013 0" rpy="0 0 0"/>
+    <axis xyz="-1 0 0"/>
+    <limit lower="-1.3" upper="1.3" effort="1.5" velocity="4.0"/>
   </joint>
 
   <link name="r_forearm">
-    <visual><geometry><mesh filename="../meshes/visual/r_forearm.stl" scale="1 1 1"/></geometry><material name="accent"/></visual>
+    <visual><origin xyz="0 0.0299 0.054"/><geometry><mesh filename="../meshes/visual/r_forearm.stl" scale="1 1 1"/></geometry><material name="accent"/></visual>
     <collision><origin xyz="0 0 -0.030"/><geometry><cylinder radius="0.012" length="0.061"/></geometry></collision>
+    <!-- hand collision, see l_forearm above -->
+    <collision><origin xyz="0 0 -0.086"/><geometry><box size="0.057 0.038 0.0506"/></geometry></collision>
     <inertial><mass value="0.06"/><inertia ixx="2e-5" iyy="8e-6" izz="2e-5" ixy="0" ixz="0" iyz="0"/></inertial>
   </link>
+  <!-- axis mirrored (-X) vs the left elbow so a positive angle bends both elbows
+       symmetrically, same convention as r_upperarm_roll -->
   <joint name="r_elbow" type="revolute">   <!-- S14 -->
     <parent link="r_upper_arm"/><child link="r_forearm"/>
     <origin xyz="0 0 -0.058" rpy="0 0 0"/>
-    <axis xyz="0 1 0"/>
+    <axis xyz="-1 0 0"/>
     <limit lower="-2.094" upper="2.094" effort="1.2" velocity="4.0"/>
   </joint>
 

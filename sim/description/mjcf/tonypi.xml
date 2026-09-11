@@ -91,43 +91,66 @@
             </body>
           </body>
 
-          <body name="l_shoulder" pos="0 0.058 0.033">
-            <joint name="l_shoulder_pitch" class="servo" axis="0 1 0" range="-2.094 2.094" actuatorfrcrange="-1.5 1.5"/>
-            <geom class="visual" mesh="l_shoulder" rgba="0.15 0.16 0.18 1"/>
+          <!-- z lowered 0.054 from the doc's 0.033: the doc's estimate put the rotation
+               axis ~5.4cm above the mesh-derived shoulder, so raising the arm swung it
+               out in a wide arc instead of pivoting in place. This aligns the arm chain
+               with the same mesh-top-vs-origin offset (~+0.011) every leg joint has. -->
+          <body name="l_shoulder" pos="0 0.0749 -0.021">
+            <!-- range narrowed from the servo's full +/-2.094 mechanical limit to a
+                 realistic safe operating envelope -- the full range swings the arm
+                 through an unnaturally wide arc, far from the body. -->
+            <joint name="l_shoulder_pitch" class="servo" axis="0 1 0" range="-1.2 1.2" actuatorfrcrange="-1.5 1.5"/>
+            <geom class="visual" mesh="l_shoulder" pos="0 -0.0169 0.054" rgba="0.15 0.16 0.18 1"/>
             <geom class="collision" type="sphere" size="0.017"/>
             <inertial pos="0 0 0" mass="0.04" diaginertia="8e-6 8e-6 8e-6"/>
 
-            <body name="l_upper_arm" pos="0 0 0">
-              <joint name="l_upperarm_roll" class="servo" axis="0 0 1" range="-2.094 2.094" actuatorfrcrange="-1.5 1.5"/>
-              <geom class="visual" mesh="l_upper_arm" rgba="0.93 0.93 0.95 1"/>
+            <body name="l_upper_arm" pos="0 0.013 0">
+              <!-- axis corrected to X (sideways lift/abduction) -- verified against the real
+                   robot; the doc's Z axis (twist only, no lift) did not match actual motion. -->
+              <joint name="l_upperarm_roll" class="servo" axis="1 0 0" range="-1.3 1.3" actuatorfrcrange="-1.5 1.5"/>
+              <geom class="visual" mesh="l_upper_arm" pos="0 -0.0299 0.054" rgba="0.93 0.93 0.95 1"/>
               <geom class="collision" type="cylinder" size="0.014 0.029" pos="0 0 -0.029"/>
               <inertial pos="0 0 0" mass="0.08" diaginertia="3e-5 1e-5 3e-5"/>
 
               <body name="l_forearm" pos="0 0 -0.058">
-                <joint name="l_elbow" class="servo" axis="0 1 0" range="-2.094 2.094" actuatorfrcrange="-1.2 1.2"/>
-                <geom class="visual" mesh="l_forearm" rgba="0.20 0.55 0.95 1"/>
+                <!-- axis corrected to X (sideways bend, matches upperarm_roll's plane) --
+                     the doc's Y axis bent the elbow fwd/back (toward the face), not sideways. -->
+                <joint name="l_elbow" class="servo" axis="1 0 0" range="-2.094 2.094" actuatorfrcrange="-1.2 1.2"/>
+                <geom class="visual" mesh="l_forearm" pos="0 -0.0299 0.054" rgba="0.20 0.55 0.95 1"/>
                 <geom class="collision" type="cylinder" size="0.012 0.0305" pos="0 0 -0.030"/>
+                <!-- the forearm mesh includes the hand; the cylinder above only covers the
+                     shaft, so this box covers the hand at the far end. -->
+                <geom class="collision" type="box" size="0.0285 0.019 0.0253" pos="0 0 -0.086"/>
                 <inertial pos="0 0 0" mass="0.06" diaginertia="2e-5 8e-6 2e-5"/>
               </body>
             </body>
           </body>
 
-          <body name="r_shoulder" pos="0 -0.058 0.033">
-            <joint name="r_shoulder_pitch" class="servo" axis="0 1 0" range="-2.094 2.094" actuatorfrcrange="-1.5 1.5"/>
-            <geom class="visual" mesh="r_shoulder" rgba="0.15 0.16 0.18 1"/>
+          <!-- z lowered 0.054, see l_shoulder above -->
+          <body name="r_shoulder" pos="0 -0.0749 -0.021">
+            <!-- range narrowed, see l_shoulder_pitch above -->
+            <joint name="r_shoulder_pitch" class="servo" axis="0 1 0" range="-1.2 1.2" actuatorfrcrange="-1.5 1.5"/>
+            <geom class="visual" mesh="r_shoulder" pos="0 0.0169 0.054" rgba="0.15 0.16 0.18 1"/>
             <geom class="collision" type="sphere" size="0.017"/>
             <inertial pos="0 0 0" mass="0.04" diaginertia="8e-6 8e-6 8e-6"/>
 
-            <body name="r_upper_arm" pos="0 0 0">
-              <joint name="r_upperarm_roll" class="servo" axis="0 0 1" range="-2.094 2.094" actuatorfrcrange="-1.5 1.5"/>
-              <geom class="visual" mesh="r_upper_arm" rgba="0.93 0.93 0.95 1"/>
+            <body name="r_upper_arm" pos="0 -0.013 0">
+              <!-- axis mirrored (-X) vs the left arm's +X so a positive ctrl lifts both
+                   arms outward/up symmetrically, see l_upperarm_roll above -->
+              <joint name="r_upperarm_roll" class="servo" axis="-1 0 0" range="-1.3 1.3" actuatorfrcrange="-1.5 1.5"/>
+              <geom class="visual" mesh="r_upper_arm" pos="0 0.0299 0.054" rgba="0.93 0.93 0.95 1"/>
               <geom class="collision" type="cylinder" size="0.014 0.029" pos="0 0 -0.029"/>
               <inertial pos="0 0 0" mass="0.08" diaginertia="3e-5 1e-5 3e-5"/>
 
               <body name="r_forearm" pos="0 0 -0.058">
-                <joint name="r_elbow" class="servo" axis="0 1 0" range="-2.094 2.094" actuatorfrcrange="-1.2 1.2"/>
-                <geom class="visual" mesh="r_forearm" rgba="0.20 0.55 0.95 1"/>
+                <!-- axis corrected to X (sideways bend), see l_elbow above -->
+                <!-- axis mirrored (-X) vs the left elbow so a positive ctrl bends both
+                     elbows symmetrically, same convention as r_upperarm_roll -->
+                <joint name="r_elbow" class="servo" axis="-1 0 0" range="-2.094 2.094" actuatorfrcrange="-1.2 1.2"/>
+                <geom class="visual" mesh="r_forearm" pos="0 0.0299 0.054" rgba="0.20 0.55 0.95 1"/>
                 <geom class="collision" type="cylinder" size="0.012 0.0305" pos="0 0 -0.030"/>
+                <!-- hand collision, see l_forearm above -->
+                <geom class="collision" type="box" size="0.0285 0.019 0.0253" pos="0 0 -0.086"/>
                 <inertial pos="0 0 0" mass="0.06" diaginertia="2e-5 8e-6 2e-5"/>
               </body>
             </body>
@@ -219,11 +242,11 @@
   <actuator>
     <position name="neck_yaw" class="servo" joint="neck_yaw" ctrlrange="-1.571 1.571"/>
     <position name="head_pitch" class="servo" joint="head_pitch" ctrlrange="-1.0 1.0"/>
-    <position name="l_shoulder_pitch" class="servo" joint="l_shoulder_pitch" ctrlrange="-2.094 2.094"/>
-    <position name="l_upperarm_roll" class="servo" joint="l_upperarm_roll" ctrlrange="-2.094 2.094"/>
+    <position name="l_shoulder_pitch" class="servo" joint="l_shoulder_pitch" ctrlrange="-1.2 1.2"/>
+    <position name="l_upperarm_roll" class="servo" joint="l_upperarm_roll" ctrlrange="-1.3 1.3"/>
     <position name="l_elbow" class="servo" joint="l_elbow" ctrlrange="-2.094 2.094"/>
-    <position name="r_shoulder_pitch" class="servo" joint="r_shoulder_pitch" ctrlrange="-2.094 2.094"/>
-    <position name="r_upperarm_roll" class="servo" joint="r_upperarm_roll" ctrlrange="-2.094 2.094"/>
+    <position name="r_shoulder_pitch" class="servo" joint="r_shoulder_pitch" ctrlrange="-1.2 1.2"/>
+    <position name="r_upperarm_roll" class="servo" joint="r_upperarm_roll" ctrlrange="-1.3 1.3"/>
     <position name="r_elbow" class="servo" joint="r_elbow" ctrlrange="-2.094 2.094"/>
     <position name="l_hip_roll" class="servo" joint="l_hip_roll" ctrlrange="-1.047 1.047"/>
     <position name="l_hip_pitch" class="servo" joint="l_hip_pitch" ctrlrange="-2.094 2.094"/>
