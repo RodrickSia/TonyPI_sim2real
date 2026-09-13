@@ -23,15 +23,13 @@ dependencies = [
 [tool.uv]
 package = false
 
-# Training is CPU-bound (MuJoCo physics + small MLP policies), so pull the CPU-only
-# torch wheels instead of the default CUDA build — saves several GB in the Docker image.
 [[tool.uv.index]]
-name = "pytorch-cpu"
-url = "https://download.pytorch.org/whl/cpu"
+name = "pytorch-cu121"
+url = "https://download.pytorch.org/whl/cu121"
 explicit = true
 
 [tool.uv.sources]
-torch = { index = "pytorch-cpu" }
+torch = { index = "pytorch-cu121" }
 
 [tool.pyright]
 # mujoco's public API is re-exported via `from mujoco._structs import *` etc. from
