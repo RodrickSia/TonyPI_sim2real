@@ -3,5 +3,12 @@ services:
     build: .
     volumes:
       - ./runs:/workspace/runs
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
     # override the config / add flags, e.g.:
-    # command: ["--config", "configs/ppo_flat.yaml", "--run-name", "my_run"]
+    command: ["--config", "configs/ppo_flat.yaml", "--run-name", "run_walk_1"]
