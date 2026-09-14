@@ -6,7 +6,7 @@ headless machine/Docker container with no display.
 Usage:
     uv run sim/scripts/eval_policy.py runs/ppo_flat/final_model.zip
     uv run sim/scripts/eval_policy.py --run-name ppo_flat   # shortcut for the best checkpoint
-    uv run sim/scripts/eval_policy.py --run-name ppo_flat --output runs/ppo_flat/eval.mp4
+    uv run sim/scripts/eval_policy.py --run-name ppo_flat --output runs/ppo_flat/eval.mp4 --device cpu
 """
 import argparse
 import sys
@@ -30,6 +30,7 @@ def main() -> None:
     parser.add_argument("--env-id", default="TonyPiFlat-v0")
     parser.add_argument("--episodes", type=int, default=5)
     parser.add_argument("--output", type=Path, help="record an mp4 here instead of opening the live viewer")
+    parser.add_argument("--device", default="auto", help="PyTorch device, e.g. cpu, cuda, or auto (default: auto)")
     args = parser.parse_args()
 
     if args.model_path is None:
@@ -40,7 +41,7 @@ def main() -> None:
         parser.error(f"no checkpoint at {args.model_path}")
 
     env = gym.make(args.env_id, render_mode="rgb_array" if args.output else "human")
-    model = PPO.load(args.model_path)
+    model = PPO.load(args.model_path, device=args.device)
 
     # if the run saved VecNormalize stats (sim/train/ppo.py does, when normalize=true),
     # apply the same obs normalization at inference -- otherwise the policy sees

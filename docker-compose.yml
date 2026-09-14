@@ -11,4 +11,5 @@ services:
               count: all
               capabilities: [gpu]
     # override the config / add flags, e.g.:
-    command: ["--config", "configs/ppo_flat.yaml", "--run-name", "run_walk_1"]
+    # command: ["--config", "configs/ppo_flat.yaml", "--run-name", "run_walk_1"]
+    

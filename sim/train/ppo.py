@@ -47,7 +47,12 @@ def _make_env(cfg: PPOConfig, run_dir: Path, n_envs: int, monitor_subdir: str):
     return vec_env
 
 
-def train(cfg: PPOConfig, runs_dir: Path, resume_from: Path | None = None) -> Path:
+def train(
+    cfg: PPOConfig,
+    runs_dir: Path,
+    resume_from: Path | None = None,
+    device: str = "auto",
+) -> Path:
     """Train (or resume) a PPO policy and return the path to the final saved model."""
     run_dir = runs_dir / cfg.run_name
     run_dir.mkdir(parents=True, exist_ok=True)
@@ -64,7 +69,7 @@ def train(cfg: PPOConfig, runs_dir: Path, resume_from: Path | None = None) -> Pa
         vec_env = VecNormalize.load(str(vecnormalize_path), vec_env.venv)
 
     if resume_from is not None:
-        model = PPO.load(resume_from, env=vec_env, tensorboard_log=str(run_dir / "tb"))
+        model = PPO.load(resume_from, env=vec_env, tensorboard_log=str(run_dir / "tb"), device=device)
     else:
         model = PPO(
             "MlpPolicy",
@@ -81,6 +86,7 @@ def train(cfg: PPOConfig, runs_dir: Path, resume_from: Path | None = None) -> Pa
             tensorboard_log=str(run_dir / "tb"),
             seed=cfg.seed,
             verbose=1,
+            device=device,
         )
 
     callback = CallbackList([

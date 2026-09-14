@@ -19,6 +19,14 @@ HEALTHY_Z_RANGE = (0.15, 0.35)
 MAX_TILT_RADIANS = 0.75
 TARGET_FORWARD_VELOCITY = 0.25
 TARGET_PELVIS_HEIGHT = 0.275
+PELVIS_BODY_ID = 2
+DEFAULT_CAMERA_CONFIG = {
+    "trackbodyid": PELVIS_BODY_ID,
+    "distance": 2.5,
+    "azimuth": 120.0,
+    "elevation": -20.0,
+    "lookat": np.array([0.0, 0.0, TARGET_PELVIS_HEIGHT]),
+}
 
 
 class TonyPiFlatEnv(MujocoEnv, utils.EzPickle):
@@ -51,7 +59,7 @@ class TonyPiFlatEnv(MujocoEnv, utils.EzPickle):
 
         MujocoEnv.__init__(
             self, model_path, frame_skip, observation_space=observation_space,
-            render_mode=render_mode, **kwargs,
+            render_mode=render_mode, default_camera_config=DEFAULT_CAMERA_CONFIG, **kwargs,
         )
 
         # start from the "home" standing keyframe instead of MuJoCo's zero pose,
