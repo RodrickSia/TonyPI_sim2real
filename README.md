@@ -77,4 +77,29 @@ uv run sim/scripts/eval_policy.py runs/ppo_flat/final_model.zip
   STLs extracted from the rigged Blender model; collision stays primitive.
 - Actuator gains (`kp`/`kv`) and joint damping/armature/friction are
   placeholders, not tuned to the real servos.
-- No IMU/joint sensors or contact excludes yet.
+- `TonyPiFlat-v0` is a command-conditioned walking task. It observes a 45-value
+  vector: 18 calibrated servo angles (radians), 18 finite-difference servo
+  velocities (radians/s), the IMU values `ax, ay, az, gx, gy, gz`, and a 3-value
+  velocity command (`vx`, `vy`, `yaw_rate`) in the robot's base frame. The
+  command is randomized during training so the policy learns to track arbitrary
+  requests, and can be set live via `env.unwrapped.set_velocity_command(...)`,
+  e.g. from a keyboard/gamepad teleop loop (`sim/scripts/teleop_policy.py`).
+  This mirrors the real robot's existing gamepad interface
+  (`hiwonder.Board.get_gamepad`), unlike an absolute world-frame goal point,
+  which the real robot cannot directly observe.
+- The Hiwonder SDK reads each servo position as a hardware pulse, not radians.
+  Deployment must apply a per-servo pulse-to-angle calibration, including the
+  servo ID, zero offset, direction, and valid range. The upstream TonyPi source
+  does not provide an anatomical mapping for its numbered `Servo1`-`Servo18`
+  channels, so that calibration must be measured on the target robot.
+- IMU noise, bias, latency, servo quantization, and contact sensing are now
+  simulated: servo reads are quantized to a 0-1000 pulse over a 240 deg sweep,
+  matching the real bus servo's reporting resolution (confirmed by
+  `angle_l, angle_h = 0, 1000` in `external/TonyPi/HiwonderSDK/hiwonder/
+  ros_robot_controller_sdk.py`). Servo and IMU reads are also delayed by
+  `sensor_read_delay_steps` control steps (default 1) to emulate bus/read
+  latency, and the IMU adds Gaussian noise plus a per-episode fixed bias
+  (`imu_*_noise_std`, `imu_*_bias_std`). These noise/bias/latency magnitudes are
+  reasonable placeholders, not measured from the real IMU chip's datasheet, and
+  should be tuned once real sensor logs are available. Foot-contact sensing is
+  still not simulated; the model has no physical foot-contact sensor equivalent.

@@ -67,6 +67,7 @@
     <body name="base_link">
       <freejoint/>
       <inertial pos="0 0 0" mass="0.001" diaginertia="1e-06 1e-06 1e-06"/>
+      <site name="imu" pos="0 0 0" size="0.005" rgba="0 0 0 0"/>
 
       <body name="pelvis" pos="0 0 0.267">
         <geom class="visual" mesh="pelvis" rgba="0.93 0.93 0.95 1"/>
@@ -99,7 +100,7 @@
                with the same mesh-top-vs-origin offset (~+0.011) every leg joint has. -->
           <body name="l_shoulder" pos="0 0.0749 -0.021">
             <!-- range narrowed from the servo's full +/-2.094 mechanical limit to a
-                 realistic safe operating envelope -- the full range swings the arm
+                realistic safe operating envelope; the full range swings the arm
                  through an unnaturally wide arc, far from the body. -->
             <joint name="l_shoulder_pitch" class="servo" axis="0 1 0" range="-1.2 1.2" actuatorfrcrange="-1.5 1.5"/>
             <geom class="visual" mesh="l_shoulder" pos="0 -0.0169 0.054" rgba="0.15 0.16 0.18 1"/>
@@ -107,7 +108,7 @@
             <inertial pos="0 0 0" mass="0.04" diaginertia="8e-6 8e-6 8e-6"/>
 
             <body name="l_upper_arm" pos="0 0.013 0">
-              <!-- axis corrected to X (sideways lift/abduction) -- verified against the real
+                  <!-- axis corrected to X (sideways lift/abduction), verified against the real
                    robot; the doc's Z axis (twist only, no lift) did not match actual motion. -->
               <joint name="l_upperarm_roll" class="servo" axis="1 0 0" range="-1.3 1.3" actuatorfrcrange="-1.5 1.5"/>
               <geom class="visual" mesh="l_upper_arm" pos="0 -0.0299 0.054" rgba="0.93 0.93 0.95 1"/>
@@ -115,7 +116,7 @@
               <inertial pos="0 0 0" mass="0.08" diaginertia="3e-5 1e-5 3e-5"/>
 
               <body name="l_forearm" pos="0 0 -0.058">
-                <!-- axis corrected to X (sideways bend, matches upperarm_roll's plane) --
+                <!-- axis corrected to X (sideways bend, matches upperarm_roll's plane);
                      the doc's Y axis bent the elbow fwd/back (toward the face), not sideways. -->
                 <joint name="l_elbow" class="servo" axis="1 0 0" range="-2.094 2.094" actuatorfrcrange="-1.2 1.2"/>
                 <geom class="visual" mesh="l_forearm" pos="0 -0.0299 0.054" rgba="0.20 0.55 0.95 1"/>
@@ -264,4 +265,9 @@
     <position name="r_ankle_pitch" class="servo" joint="r_ankle_pitch" ctrlrange="-1.571 1.571"/>
     <position name="r_ankle_roll" class="servo" joint="r_ankle_roll" ctrlrange="-1.047 1.047"/>
   </actuator>
+
+  <sensor>
+    <accelerometer name="imu_accelerometer" site="imu"/>
+    <gyro name="imu_gyroscope" site="imu"/>
+  </sensor>
 </mujoco>
