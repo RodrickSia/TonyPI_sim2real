@@ -39,6 +39,12 @@ OBSERVATION_LAYOUT = (
     "imu_angular_velocity_rad_s[3]",
     "velocity_command_base[vx_m_s, vy_m_s, yaw_rate_rad_s]",
 )
+# indices into the 18-actuator order (see the <actuator> block in tonypi.xml)
+L_HIP_PITCH_ACTUATOR_IDX = 9
+L_KNEE_ACTUATOR_IDX = 10
+R_HIP_PITCH_ACTUATOR_IDX = 14
+R_KNEE_ACTUATOR_IDX = 15
+LEG_JOINT_VELOCITY_CAP_RAD_S = 3.0  # caps the activity/alternation bonus so frantic shaking isn't over-rewarded
 DEFAULT_CAMERA_CONFIG = {
     "trackbodyid": PELVIS_BODY_ID,
     "distance": 2.5,
@@ -55,10 +61,12 @@ class TonyPiFlatEnv(MujocoEnv, utils.EzPickle):
         self,
         model_path: str = DEFAULT_MODEL_PATH,
         frame_skip: int = 10,  # dt = 0.002 (model timestep) * 10 = 0.02s -> matches render_fps=50
-        forward_velocity_reward_weight: float = 1.0,
+        forward_velocity_reward_weight: float = 4.0,
         lateral_velocity_reward_weight: float = 0.5,
         yaw_rate_reward_weight: float = 0.5,
-        command_vx_range: tuple[float, float] = (0.0, 0.3),
+        leg_activity_reward_weight: float = 0.05,
+        leg_alternation_reward_weight: float = 0.1,
+        command_vx_range: tuple[float, float] = (0.1, 0.3),
         command_vy_range: tuple[float, float] = (0.0, 0.0),
         command_yaw_rate_range: tuple[float, float] = (-0.3, 0.3),
         randomize_command: bool = True,
@@ -78,7 +86,8 @@ class TonyPiFlatEnv(MujocoEnv, utils.EzPickle):
     ):
         utils.EzPickle.__init__(
             self, model_path, frame_skip, forward_velocity_reward_weight, lateral_velocity_reward_weight,
-            yaw_rate_reward_weight, command_vx_range, command_vy_range, command_yaw_rate_range,
+            yaw_rate_reward_weight, leg_activity_reward_weight, leg_alternation_reward_weight,
+            command_vx_range, command_vy_range, command_yaw_rate_range,
             randomize_command, command_resample_steps, simulate_servo_quantization, sensor_read_delay_steps,
             imu_accel_noise_std, imu_gyro_noise_std, imu_accel_bias_std, imu_gyro_bias_std, ctrl_cost_weight,
             healthy_reward, healthy_z_range, reset_noise_scale, render_mode, **kwargs,
@@ -86,6 +95,8 @@ class TonyPiFlatEnv(MujocoEnv, utils.EzPickle):
         self._forward_velocity_reward_weight = forward_velocity_reward_weight
         self._lateral_velocity_reward_weight = lateral_velocity_reward_weight
         self._yaw_rate_reward_weight = yaw_rate_reward_weight
+        self._leg_activity_reward_weight = leg_activity_reward_weight
+        self._leg_alternation_reward_weight = leg_alternation_reward_weight
         self._command_vx_range = command_vx_range
         self._command_vy_range = command_vy_range
         self._command_yaw_rate_range = command_yaw_rate_range
@@ -126,6 +137,7 @@ class TonyPiFlatEnv(MujocoEnv, utils.EzPickle):
         self._previous_action = np.zeros(self.model.nu)
         actuator_joint_ids = self.model.actuator_trnid[:, 0]
         self._actuator_qpos_adrs = self.model.jnt_qposadr[actuator_joint_ids]
+        self._actuator_dof_adrs = self.model.jnt_dofadr[actuator_joint_ids]
         self._actuator_joint_ranges = self.model.jnt_range[actuator_joint_ids]
         self._home_actuator_qpos = self.init_qpos[self._actuator_qpos_adrs].copy()
         self._imu_accelerometer_adr = self._sensor_data_address("imu_accelerometer")
@@ -228,19 +240,36 @@ class TonyPiFlatEnv(MujocoEnv, utils.EzPickle):
         pelvis_up = self.data.xmat[self._pelvis_body_id].reshape(3, 3)[:, 2]
         pelvis_z = self.data.xpos[self._pelvis_body_id, 2]
         actuator_qpos = self.data.qpos[self._actuator_qpos_adrs]
+        actuator_qvel = self.data.qvel[self._actuator_dof_adrs]
         joint_margin = np.minimum(actuator_qpos - self._actuator_joint_ranges[:, 0], self._actuator_joint_ranges[:, 1] - actuator_qpos)
         forward_velocity_reward = self._forward_velocity_reward_weight * np.exp(-16.0 * np.square(base_velocity[0] - self._velocity_command[0]))
         lateral_velocity_reward = self._lateral_velocity_reward_weight * np.exp(-16.0 * np.square(base_velocity[1] - self._velocity_command[1]))
         yaw_rate_reward = self._yaw_rate_reward_weight * np.exp(-4.0 * np.square(yaw_rate - self._velocity_command[2]))
+        leg_joint_vel = np.clip(
+            np.abs(actuator_qvel[[L_HIP_PITCH_ACTUATOR_IDX, L_KNEE_ACTUATOR_IDX, R_HIP_PITCH_ACTUATOR_IDX, R_KNEE_ACTUATOR_IDX]]),
+            0.0, LEG_JOINT_VELOCITY_CAP_RAD_S,
+        )
+        leg_activity_reward = self._leg_activity_reward_weight * np.mean(leg_joint_vel)
+        l_hip_pitch_vel = actuator_qvel[L_HIP_PITCH_ACTUATOR_IDX]
+        r_hip_pitch_vel = actuator_qvel[R_HIP_PITCH_ACTUATOR_IDX]
+        # positive only when the hips swing in opposite directions (alternating stride, not hopping in place)
+        leg_alternation_reward = self._leg_alternation_reward_weight * np.clip(
+            -l_hip_pitch_vel * r_hip_pitch_vel, 0.0, LEG_JOINT_VELOCITY_CAP_RAD_S ** 2,
+        )
         upright_reward = np.square(pelvis_up[2])
         height_reward = np.exp(-200.0 * np.square(pelvis_z - TARGET_PELVIS_HEIGHT))
         angular_cost = 0.05 * np.sum(np.square(roll_pitch_rate))  # yaw rate is commanded, not penalized here
         ctrl_cost = self._ctrl_cost_weight * np.sum(np.square(self.data.actuator_force))
-        action_rate_cost = 0.01 * np.sum(np.square(action - self._previous_action))
+        action_rate_cost = 0.002 * np.sum(np.square(action - self._previous_action))
         posture_cost = 0.02 * np.sum(np.square(actuator_qpos[:8] - self._home_actuator_qpos[:8]))
         joint_limit_cost = 0.1 * np.sum(np.square(np.clip(0.15 - joint_margin, 0.0, None)))
         healthy_reward = self._healthy_reward if self.is_healthy else 0.0
-        reward = forward_velocity_reward + lateral_velocity_reward + yaw_rate_reward + upright_reward + height_reward + healthy_reward - angular_cost - ctrl_cost - action_rate_cost - posture_cost - joint_limit_cost
+        reward = (
+            forward_velocity_reward + lateral_velocity_reward + yaw_rate_reward
+            + leg_activity_reward + leg_alternation_reward
+            + upright_reward + height_reward + healthy_reward
+            - angular_cost - ctrl_cost - action_rate_cost - posture_cost - joint_limit_cost
+        )
         self._previous_action = action.copy()
 
         terminated = not self.is_healthy
@@ -249,6 +278,8 @@ class TonyPiFlatEnv(MujocoEnv, utils.EzPickle):
             "forward_velocity_reward": forward_velocity_reward,
             "lateral_velocity_reward": lateral_velocity_reward,
             "yaw_rate_reward": yaw_rate_reward,
+            "leg_activity_reward": leg_activity_reward,
+            "leg_alternation_reward": leg_alternation_reward,
             "upright_reward": upright_reward,
             "height_reward": height_reward,
             "angular_cost": angular_cost,
